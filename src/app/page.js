@@ -262,7 +262,8 @@ export default function Home() {
 
     stopSpeech();
 
-    const utterance = new SpeechSynthesisUtterance(message);
+    const sanitizedMessage = message.replace(/\*/g, "").replace(/\s+/g, " ").trim();
+    const utterance = new SpeechSynthesisUtterance(sanitizedMessage);
     const availableVoices = synth.getVoices();
     const selectedVoice =
       availableVoices.find((voice) => voice.voiceURI === voiceURI) ||
@@ -316,8 +317,15 @@ export default function Home() {
       return;
     }
 
+    const rocko = voices.find(
+      (voice) =>
+        voice.name?.toLowerCase().includes("rocko") &&
+        voice.lang?.toLowerCase() === "en-us"
+    );
     const preferred =
-      voices.find((voice) => voice.lang?.startsWith("en")) || voices[0];
+      rocko ||
+      voices.find((voice) => voice.lang?.startsWith("en")) ||
+      voices[0];
     if (preferred) {
       setVoiceURI(preferred.voiceURI);
     }
