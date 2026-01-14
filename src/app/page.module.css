@@ -81,6 +81,23 @@
   padding: 4rem 0;
 }
 
+.title {
+  font-size: 2.5rem;
+}
+
+.letter {
+  display: inline-block;
+  transition: color 150ms ease;
+}
+
+.letter:hover {
+  color: #e4572e;
+}
+
+.space {
+  display: inline-block;
+}
+
 .center::before {
   background: var(--secondary-glow);
   border-radius: 50%;
