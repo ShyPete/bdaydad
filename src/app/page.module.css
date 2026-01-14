@@ -40,6 +40,73 @@
   z-index: 5;
 }
 
+.crashOverlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 10, 18, 0.92);
+  z-index: 7;
+  animation: crashFlicker 0.8s steps(2, end) infinite;
+}
+
+.crashCard {
+  padding: 2rem 2.6rem;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 18px;
+  background: rgba(14, 16, 26, 0.9);
+  text-align: center;
+  font-family: "Space Mono", "Courier New", monospace;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.crashTitle {
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+}
+
+.crashCopy {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.safeOverlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: grid;
+  place-items: center;
+  z-index: 8;
+  font-family: "Space Mono", "Courier New", monospace;
+  color: #7cff7a;
+}
+
+.terminalWindow {
+  width: min(1080px, 95vw);
+  min-height: 390px;
+  border: 2px solid rgba(124, 255, 122, 0.35);
+  padding: 1.6rem 2rem;
+  background: #000;
+  box-shadow: 0 0 30px rgba(124, 255, 122, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.terminalLine {
+  opacity: 0.9;
+}
+
+.safeModeTitle {
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
 .soundToggle {
   position: fixed;
   top: 1.5rem;
@@ -145,6 +212,33 @@
 
 .cakeBotSpeaking {
   animation: floatSpeak 2.4s ease-in-out infinite;
+}
+
+.cakeBotGlitch {
+  animation: float 4s ease-in-out infinite, glitchShake 0.18s steps(2, end) infinite;
+}
+
+.cakeBotAngry .eyebrows {
+  opacity: 1;
+  transform: translateX(-50%) translateY(6px);
+}
+
+.cakeBotAngry .eyebrow {
+  transform: rotate(20deg);
+}
+
+.cakeBotAngry .eyebrow:last-child {
+  transform: rotate(-20deg);
+}
+
+.cakeBotAngry .mouth {
+  --mouth-rotate: 180deg;
+  --mouth-translate: 10px;
+  border-bottom-width: 5px;
+}
+
+.cakeBotAngry .eye {
+  box-shadow: 0 0 0 6px #f7f0ea, 0 0 14px rgba(255, 82, 82, 0.65);
 }
 
 .cakeBase,
@@ -264,6 +358,9 @@
   height: 32px;
   border-bottom: 4px solid #1d1b26;
   border-radius: 0 0 60px 60px;
+  --mouth-rotate: 0deg;
+  --mouth-translate: 0px;
+  transform: translateY(var(--mouth-translate)) rotate(var(--mouth-rotate));
 }
 
 .cakeBotSpeaking .mouth {
@@ -476,13 +573,44 @@
   }
 }
 
+@keyframes glitchShake {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  20% {
+    transform: translate(-2px, 2px) rotate(-0.6deg);
+  }
+  40% {
+    transform: translate(2px, -1px) rotate(0.6deg);
+  }
+  60% {
+    transform: translate(-1px, -2px) rotate(-0.4deg);
+  }
+  80% {
+    transform: translate(2px, 1px) rotate(0.4deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes crashFlicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
 @keyframes mouthTalk {
   0%,
   100% {
-    transform: scaleY(0.7);
+    transform: translateY(var(--mouth-translate)) rotate(var(--mouth-rotate)) scaleY(0.7);
   }
   50% {
-    transform: scaleY(1.1);
+    transform: translateY(var(--mouth-translate)) rotate(var(--mouth-rotate)) scaleY(1.1);
   }
 }
 

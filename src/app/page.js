@@ -14,13 +14,39 @@ export default function Home() {
   const [analysisStatus, setAnalysisStatus] = useState("idle");
   const [analysisMessage, setAnalysisMessage] = useState("");
   const [analysisError, setAnalysisError] = useState("");
+  const [analysisLoadingText, setAnalysisLoadingText] = useState("");
+  const [analysisTypedText, setAnalysisTypedText] = useState("");
+  const [analysisErrorTypedText, setAnalysisErrorTypedText] = useState("");
   const [voices, setVoices] = useState([]);
   const [voiceURI, setVoiceURI] = useState("");
   const [speechRate, setSpeechRate] = useState(1.05);
   const [speechPitch, setSpeechPitch] = useState(1.1);
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [botAngry, setBotAngry] = useState(false);
+  const [crashStage, setCrashStage] = useState("idle");
+  const [showOutburst, setShowOutburst] = useState(false);
+  const [outburstText, setOutburstText] = useState("");
+  const [outburstDone, setOutburstDone] = useState(false);
+  const [outburstSpeechDone, setOutburstSpeechDone] = useState(false);
+  const [showConfusion, setShowConfusion] = useState(false);
+  const [confusionText, setConfusionText] = useState("");
+  const [confusionSpeechDone, setConfusionSpeechDone] = useState(false);
+  const [safeStage, setSafeStage] = useState("off");
+  const [terminalLines, setTerminalLines] = useState([]);
   const daySelectRef = useRef(null);
   const speechRef = useRef(null);
+  const crashTimeoutRef = useRef(null);
+  const outburstTimeoutRef = useRef(null);
+  const confusionTimeoutRef = useRef(null);
+  const confusionTypeRef = useRef(null);
+  const analysisTypeRef = useRef(null);
+  const analysisErrorTypeRef = useRef(null);
+  const analysisLoadingTypeRef = useRef(null);
+  const glitchNoiseRef = useRef(null);
+  const crashToneRef = useRef(null);
+  const safeStartTimeoutRef = useRef(null);
+  const safeModeTimeoutRef = useRef(null);
+  const terminalIntervalRef = useRef(null);
   const audioRef = useRef({
     ctx: null,
     source: null,
@@ -242,6 +268,17 @@ export default function Home() {
     };
   };
 
+  const stopCrashTone = () => {
+    if (crashToneRef.current) {
+      try {
+        crashToneRef.current.stop();
+      } catch (error) {
+        // Ignore stop errors on already-stopped oscillators.
+      }
+      crashToneRef.current = null;
+    }
+  };
+
   const stopSpeech = () => {
     if (typeof window === "undefined" || !window.speechSynthesis) {
       return;
@@ -251,7 +288,7 @@ export default function Home() {
     setIsSpeaking(false);
   };
 
-  const speakMessage = (message) => {
+  const speakMessage = (message, options = {}) => {
     if (typeof window === "undefined") {
       return;
     }
@@ -277,8 +314,18 @@ export default function Home() {
     utterance.rate = speechRate;
     utterance.pitch = speechPitch;
     utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      if (options.onEnd) {
+        options.onEnd();
+      }
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      if (options.onEnd) {
+        options.onEnd();
+      }
+    };
 
     speechRef.current = utterance;
     synth.speak(utterance);
@@ -342,6 +389,40 @@ export default function Home() {
     return () => {
       stopAmbient();
       stopSpeech();
+      if (crashTimeoutRef.current) {
+        window.clearTimeout(crashTimeoutRef.current);
+      }
+      if (outburstTimeoutRef.current) {
+        window.clearTimeout(outburstTimeoutRef.current);
+      }
+      if (confusionTimeoutRef.current) {
+        window.clearTimeout(confusionTimeoutRef.current);
+      }
+      if (confusionTypeRef.current) {
+        window.clearTimeout(confusionTypeRef.current);
+      }
+      if (analysisTypeRef.current) {
+        window.clearTimeout(analysisTypeRef.current);
+      }
+      if (analysisErrorTypeRef.current) {
+        window.clearTimeout(analysisErrorTypeRef.current);
+      }
+      if (analysisLoadingTypeRef.current) {
+        window.clearTimeout(analysisLoadingTypeRef.current);
+      }
+      if (glitchNoiseRef.current) {
+        window.clearInterval(glitchNoiseRef.current);
+      }
+      if (safeStartTimeoutRef.current) {
+        window.clearTimeout(safeStartTimeoutRef.current);
+      }
+      if (safeModeTimeoutRef.current) {
+        window.clearTimeout(safeModeTimeoutRef.current);
+      }
+      if (terminalIntervalRef.current) {
+        window.clearInterval(terminalIntervalRef.current);
+      }
+      stopCrashTone();
       const { ctx } = audioRef.current;
       if (ctx) {
         ctx.close();
@@ -356,7 +437,39 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (analysisStatus !== "loading") {
+      setAnalysisLoadingText("");
+      return undefined;
+    }
+
+    if (analysisLoadingTypeRef.current) {
+      window.clearTimeout(analysisLoadingTypeRef.current);
+    }
+
+    const message = "Crunching birthday data...";
+    let index = 0;
+    setAnalysisLoadingText("");
+
+    const typeNext = () => {
+      index += 1;
+      setAnalysisLoadingText(message.slice(0, index));
+      if (index < message.length) {
+        analysisLoadingTypeRef.current = window.setTimeout(typeNext, 24);
+      }
+    };
+
+    analysisLoadingTypeRef.current = window.setTimeout(typeNext, 120);
+
+    return () => {
+      if (analysisLoadingTypeRef.current) {
+        window.clearTimeout(analysisLoadingTypeRef.current);
+      }
+    };
+  }, [analysisStatus]);
+
+  useEffect(() => {
     if (analysisStatus !== "done" || !analysisMessage) {
+      setAnalysisTypedText("");
       return;
     }
     if (!soundEnabled) {
@@ -366,6 +479,71 @@ export default function Home() {
   }, [analysisStatus, analysisMessage, soundEnabled]);
 
   useEffect(() => {
+    if (analysisStatus !== "done" || !analysisMessage) {
+      setAnalysisTypedText("");
+      return undefined;
+    }
+
+    if (analysisTypeRef.current) {
+      window.clearTimeout(analysisTypeRef.current);
+    }
+
+    let index = 0;
+    setAnalysisTypedText("");
+
+    const typeNext = () => {
+      index += 1;
+      setAnalysisTypedText(analysisMessage.slice(0, index));
+      if (index < analysisMessage.length) {
+        analysisTypeRef.current = window.setTimeout(typeNext, 24);
+      }
+    };
+
+    analysisTypeRef.current = window.setTimeout(typeNext, 140);
+
+    return () => {
+      if (analysisTypeRef.current) {
+        window.clearTimeout(analysisTypeRef.current);
+      }
+    };
+  }, [analysisStatus, analysisMessage]);
+
+  useEffect(() => {
+    if (analysisStatus !== "error" || !analysisError) {
+      setAnalysisErrorTypedText("");
+      return undefined;
+    }
+
+    if (analysisErrorTypeRef.current) {
+      window.clearTimeout(analysisErrorTypeRef.current);
+    }
+
+    const message = `Oops. ${analysisError}`;
+    let index = 0;
+    setAnalysisErrorTypedText("");
+
+    const typeNext = () => {
+      index += 1;
+      setAnalysisErrorTypedText(message.slice(0, index));
+      if (index < message.length) {
+        analysisErrorTypeRef.current = window.setTimeout(typeNext, 24);
+      }
+    };
+
+    analysisErrorTypeRef.current = window.setTimeout(typeNext, 140);
+
+    return () => {
+      if (analysisErrorTypeRef.current) {
+        window.clearTimeout(analysisErrorTypeRef.current);
+      }
+    };
+  }, [analysisStatus, analysisError]);
+
+  useEffect(() => {
+    if (showMissingButton) {
+      return undefined;
+    }
+
     if (month === "January" && dayOpen) {
       const timeoutId = window.setTimeout(() => {
         setShowMissingButton(true);
@@ -373,8 +551,310 @@ export default function Home() {
       return () => window.clearTimeout(timeoutId);
     }
 
-    setShowMissingButton(false);
-  }, [month, dayOpen]);
+    return undefined;
+  }, [month, dayOpen, showMissingButton]);
+
+  useEffect(() => {
+    if (crashStage !== "glitch") {
+      return undefined;
+    }
+
+    if (!showConfusion || !confusionSpeechDone) {
+      return undefined;
+    }
+
+    if (crashTimeoutRef.current) {
+      window.clearTimeout(crashTimeoutRef.current);
+    }
+
+    crashTimeoutRef.current = window.setTimeout(() => {
+      setCrashStage("crash");
+    }, 2000);
+
+    return () => {
+      if (crashTimeoutRef.current) {
+        window.clearTimeout(crashTimeoutRef.current);
+      }
+    };
+  }, [crashStage, showConfusion, confusionSpeechDone]);
+
+  useEffect(() => {
+    if (crashStage !== "crash") {
+      return undefined;
+    }
+
+    if (safeStartTimeoutRef.current) {
+      window.clearTimeout(safeStartTimeoutRef.current);
+    }
+
+    safeStartTimeoutRef.current = window.setTimeout(() => {
+      setSafeStage("terminal");
+    }, 5000);
+
+    return () => {
+      if (safeStartTimeoutRef.current) {
+        window.clearTimeout(safeStartTimeoutRef.current);
+      }
+    };
+  }, [crashStage]);
+
+  useEffect(() => {
+    if (safeStage !== "terminal") {
+      if (terminalIntervalRef.current) {
+        window.clearInterval(terminalIntervalRef.current);
+      }
+      return undefined;
+    }
+
+    const bootLines = [
+      "[BOOT] BirthdayBot5000 recovery initialized",
+      "[CHECK] Memory banks: OK",
+      "[CHECK] CakeBot actuator: DEGRADED",
+      "[CHECK] Confetti driver: OK",
+      "[WARN] Ego module: unstable",
+      "[REPAIR] Running birthday inference fallback",
+      "[LOAD] Safe mode protocols",
+      "[SYNC] Calibrating vibes",
+      "[CHECK] Candle flame drivers: OK",
+      "[CHECK] Sprinkle dispenser: OK",
+      "[WARN] Sass engine: overheated",
+      "[PATCH] Applying humility hotfix",
+      "[OK] Humility hotfix applied",
+      "[CHECK] Vibe sensors: OK",
+      "[CHECK] Party bus: ONLINE",
+      "[WARN] Birthday memory cache: stale",
+      "[CLEAN] Flushing memory cache",
+      "[OK] Memory cache flushed",
+      "[VERIFY] User input handlers: OK",
+      "[VERIFY] Date parser: OK",
+      "[CHECK] Glitter fan: OK",
+      "[WARN] Confidence meter: pegged",
+      "[THROTTLE] Reducing confidence output",
+      "[OK] Confidence output normalized",
+      "[LOAD] Safe mode UI shell",
+      "[SYNC] Clock drift: corrected",
+      "[OK] Boot sequence complete",
+    ];
+
+    let index = 0;
+    setTerminalLines([]);
+
+    terminalIntervalRef.current = window.setInterval(() => {
+      setTerminalLines((prev) => {
+        if (index >= bootLines.length) {
+          return prev;
+        }
+        const next = [...prev, bootLines[index]];
+        index += 1;
+        return next;
+      });
+    }, 700);
+
+    if (safeModeTimeoutRef.current) {
+      window.clearTimeout(safeModeTimeoutRef.current);
+    }
+
+    safeModeTimeoutRef.current = window.setTimeout(() => {
+      setSafeStage("safe");
+    }, 10000);
+
+    return () => {
+      if (terminalIntervalRef.current) {
+        window.clearInterval(terminalIntervalRef.current);
+      }
+      if (safeModeTimeoutRef.current) {
+        window.clearTimeout(safeModeTimeoutRef.current);
+      }
+    };
+  }, [safeStage]);
+
+  useEffect(() => {
+    if (!showOutburst) {
+      setOutburstText("");
+      setOutburstDone(false);
+      setOutburstSpeechDone(false);
+      setShowConfusion(false);
+      setConfusionText("");
+      setConfusionSpeechDone(false);
+      return undefined;
+    }
+
+    const message =
+      "What?! That's impossible! I'm perfect! I can never be wrong!";
+    let index = 0;
+    setOutburstText("");
+    setOutburstDone(false);
+    const canSpeak =
+      soundEnabled &&
+      typeof window !== "undefined" &&
+      window.speechSynthesis &&
+      typeof window.SpeechSynthesisUtterance !== "undefined";
+    setOutburstSpeechDone(!canSpeak);
+    if (canSpeak) {
+      speakMessage(message, {
+        onEnd: () => setOutburstSpeechDone(true),
+      });
+    }
+
+    const typeNext = () => {
+      index += 1;
+      setOutburstText(message.slice(0, index));
+      if (index < message.length) {
+        outburstTimeoutRef.current = window.setTimeout(typeNext, 24);
+      } else {
+        setOutburstDone(true);
+        if (!canSpeak) {
+          setOutburstSpeechDone(true);
+        }
+      }
+    };
+
+    outburstTimeoutRef.current = window.setTimeout(typeNext, 160);
+
+    return () => {
+      if (outburstTimeoutRef.current) {
+        window.clearTimeout(outburstTimeoutRef.current);
+      }
+    };
+  }, [showOutburst]);
+
+  useEffect(() => {
+    if (!showOutburst || !outburstDone || !outburstSpeechDone) {
+      return undefined;
+    }
+
+    if (confusionTimeoutRef.current) {
+      window.clearTimeout(confusionTimeoutRef.current);
+    }
+
+    confusionTimeoutRef.current = window.setTimeout(() => {
+      setShowConfusion(true);
+    }, 1000);
+
+    return () => {
+      if (confusionTimeoutRef.current) {
+        window.clearTimeout(confusionTimeoutRef.current);
+      }
+    };
+  }, [showOutburst, outburstDone, outburstSpeechDone]);
+
+  useEffect(() => {
+    if (!showConfusion) {
+      setConfusionText("");
+      setConfusionSpeechDone(false);
+      return undefined;
+    }
+
+    const message =
+      "I can't believe this! I... I... ERROR! DOES NOT COMPUTE! DOES NOT COMPUTE! HELP ME!!!";
+    let index = 0;
+    setConfusionText("");
+    const canSpeak =
+      soundEnabled &&
+      typeof window !== "undefined" &&
+      window.speechSynthesis &&
+      typeof window.SpeechSynthesisUtterance !== "undefined";
+    setConfusionSpeechDone(!canSpeak);
+    if (canSpeak) {
+      speakMessage(message, {
+        onEnd: () => setConfusionSpeechDone(true),
+      });
+    }
+
+    if (glitchNoiseRef.current) {
+      window.clearInterval(glitchNoiseRef.current);
+    }
+
+    const playGlitchNoise = () => {
+      const { ctx, masterGain } = audioRef.current;
+      if (!ctx || !masterGain || ctx.state !== "running") {
+        return;
+      }
+
+      const burst = ctx.createBuffer(
+        1,
+        Math.floor(ctx.sampleRate * 0.08),
+        ctx.sampleRate
+      );
+      const data = burst.getChannelData(0);
+      for (let i = 0; i < data.length; i += 1) {
+        data[i] = (Math.random() * 2 - 1) * 0.5;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = burst;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "highpass";
+      filter.frequency.value = 1800 + Math.random() * 1200;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.12;
+      noise.connect(filter).connect(gain).connect(masterGain);
+      noise.start();
+      noise.stop(ctx.currentTime + 0.08);
+    };
+
+    const typeNext = () => {
+      index += 1;
+      setConfusionText(message.slice(0, index));
+      if (index < message.length) {
+        confusionTypeRef.current = window.setTimeout(typeNext, 24);
+      } else {
+        if (!canSpeak) {
+          setConfusionSpeechDone(true);
+        }
+        if (glitchNoiseRef.current) {
+          window.clearInterval(glitchNoiseRef.current);
+        }
+      }
+    };
+
+    glitchNoiseRef.current = window.setInterval(playGlitchNoise, 120);
+    confusionTypeRef.current = window.setTimeout(typeNext, 160);
+
+    return () => {
+      if (confusionTypeRef.current) {
+        window.clearTimeout(confusionTypeRef.current);
+      }
+      if (glitchNoiseRef.current) {
+        window.clearInterval(glitchNoiseRef.current);
+      }
+      stopCrashTone();
+    };
+  }, [showConfusion, soundEnabled]);
+
+  useEffect(() => {
+    if (!confusionSpeechDone || !soundEnabled) {
+      return undefined;
+    }
+
+    const { ctx, masterGain } = audioRef.current;
+    if (!ctx || !masterGain || ctx.state !== "running") {
+      return undefined;
+    }
+
+    if (crashToneRef.current) {
+      return undefined;
+    }
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 2000;
+    gain.gain.value = 0.084;
+    osc.connect(gain).connect(masterGain);
+    osc.start();
+    crashToneRef.current = osc;
+
+    return () => {
+      stopCrashTone();
+    };
+  }, [confusionSpeechDone, soundEnabled]);
+
+  useEffect(() => {
+    if (safeStage === "safe") {
+      stopCrashTone();
+    }
+  }, [safeStage]);
 
   const toggleDayDropdown = () => {
     const select = daySelectRef.current;
@@ -391,10 +871,22 @@ export default function Home() {
     select.click();
   };
 
+  const handleMissingClick = () => {
+    toggleDayDropdown();
+    if (crashStage !== "idle") {
+      return;
+    }
+
+    setBotAngry(true);
+    setShowOutburst(true);
+    setCrashStage("glitch");
+  };
+
   const handleToggleSound = async () => {
     if (soundEnabled) {
       stopSpeech();
       stopAmbient();
+      stopCrashTone();
       setSoundEnabled(false);
       setSoundBlocked(false);
       return;
@@ -547,6 +1039,8 @@ export default function Home() {
         <div
           className={`${styles.cakeBot} ${
             isSpeaking ? styles.cakeBotSpeaking : ""
+          } ${botAngry ? styles.cakeBotAngry : ""} ${
+            crashStage !== "idle" ? styles.cakeBotGlitch : ""
           }`}
           aria-hidden="true"
         >
@@ -595,17 +1089,27 @@ export default function Home() {
             </div>
             {analysisStatus === "loading" ? (
               <div className={`${styles.bubble} ${styles.bot}`}>
-                Crunching birthday data...
+                {analysisLoadingText || "Crunching birthday data..."}
               </div>
             ) : null}
             {analysisStatus === "done" ? (
               <div className={`${styles.bubble} ${styles.bot}`}>
-                {analysisMessage}
+                {analysisTypedText || analysisMessage}
               </div>
             ) : null}
             {analysisStatus === "error" ? (
               <div className={`${styles.bubble} ${styles.bot}`}>
-                Oops. {analysisError}
+                {analysisErrorTypedText || `Oops. ${analysisError}`}
+              </div>
+            ) : null}
+            {showOutburst ? (
+              <div className={`${styles.bubble} ${styles.bot}`}>
+                {outburstText}
+              </div>
+            ) : null}
+            {showConfusion ? (
+              <div className={`${styles.bubble} ${styles.bot}`}>
+                {confusionText}
               </div>
             ) : null}
           </div>
@@ -660,13 +1164,42 @@ export default function Home() {
             <button
               className={`${styles.button} ${styles.secondaryButton}`}
               type="button"
-              onClick={toggleDayDropdown}
+              onClick={handleMissingClick}
             >
               My birthday is not listed
             </button>
           ) : null}
         </div>
       </section>
+
+      {crashStage === "crash" ? (
+        <div className={styles.crashOverlay} role="alert" aria-live="assertive">
+          <div className={styles.crashCard}>
+            <p className={styles.crashTitle}>BirthdayBot5000 has failed.</p>
+            <p className={styles.crashCopy}>
+              Initiating emergency reboot sequence...
+            </p>
+          </div>
+        </div>
+      ) : null}
+      {safeStage === "terminal" ? (
+        <div className={styles.safeOverlay} role="status" aria-live="polite">
+          <div className={styles.terminalWindow}>
+            {terminalLines.map((line, index) => (
+              <div key={`${line}-${index}`} className={styles.terminalLine}>
+                {line}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {safeStage === "safe" ? (
+        <div className={styles.safeOverlay} role="status" aria-live="polite">
+          <div className={styles.safeModeTitle}>
+            BIRTHDAYBOT5000 SAFE MODE
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
