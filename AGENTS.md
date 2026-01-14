@@ -19,6 +19,9 @@ whenever scope, tone, or constraints change.
 ## Guardrails
 - Keep it family friendly and positive.
 - Any "error" screens must be obviously safe and reversible.
+- Always ask before making changes that are not explicitly mentioned.
+- Do not make changes that are not specifically mentioned without asking first.
+- Ask clarifying questions when a request is unclear.
 
 ## When updating
 - Add new features, flow notes, and tech decisions here.
