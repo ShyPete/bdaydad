@@ -31,6 +31,7 @@ export default function Home() {
   const [showConfusion, setShowConfusion] = useState(false);
   const [confusionText, setConfusionText] = useState("");
   const [confusionSpeechDone, setConfusionSpeechDone] = useState(false);
+  const [missingButtonDisabled, setMissingButtonDisabled] = useState(false);
   const [safeStage, setSafeStage] = useState("off");
   const [terminalLines, setTerminalLines] = useState([]);
   const daySelectRef = useRef(null);
@@ -579,6 +580,12 @@ export default function Home() {
   }, [crashStage, showConfusion, confusionSpeechDone]);
 
   useEffect(() => {
+    if (crashStage === "crash") {
+      stopAmbient();
+    }
+  }, [crashStage]);
+
+  useEffect(() => {
     if (crashStage !== "crash") {
       return undefined;
     }
@@ -851,7 +858,7 @@ export default function Home() {
   }, [confusionSpeechDone, soundEnabled]);
 
   useEffect(() => {
-    if (safeStage === "safe") {
+    if (safeStage === "terminal") {
       stopCrashTone();
     }
   }, [safeStage]);
@@ -877,6 +884,7 @@ export default function Home() {
       return;
     }
 
+    setMissingButtonDisabled(true);
     setBotAngry(true);
     setShowOutburst(true);
     setCrashStage("glitch");
@@ -1165,6 +1173,7 @@ export default function Home() {
               className={`${styles.button} ${styles.secondaryButton}`}
               type="button"
               onClick={handleMissingClick}
+              disabled={missingButtonDisabled}
             >
               My birthday is not listed
             </button>
