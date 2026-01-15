@@ -21,7 +21,7 @@ whenever scope, tone, or constraints change.
 - Analyze responses vary via prompt modes/formats/toggles plus a client-side `variantSeed` for per-click variety.
 - Seasonal/astrology traits are hidden tone cues only; do not mention them explicitly.
 - BirthdayBot speaks responses aloud with browser TTS; the cake-bot animates while speaking and chat responses type out.
-- Current status: Intro, Initial prompt, and Fake crash are complete. Next: Safe mode questionnaire and Finale.
+- Current status: Safe mode terminal + popup quiz flow implemented with randomized questions, scoring, and pass/fail endings. Next: Final birthday wish scene.
 
 ## Tone and style
 - Warm, funny, and a bit glitchy.
@@ -34,8 +34,17 @@ whenever scope, tone, or constraints change.
 - Always ask before making changes that are not explicitly mentioned.
 - Do not make changes that are not specifically mentioned without asking first.
 - Ask clarifying questions when a request is unclear.
+- Do not change the popup window style unless explicitly requested; keep its font and color scheme consistent.
+- "Clear the popup window" means removing only the popup body content, not the title bar.
 
 ## When updating
 - Add new features, flow notes, and tech decisions here.
 - Keep personal facts in sync with project context.
 - Always read `AGENTS.md` and `projectcontext.md`, and suggest updates to them after making relevant changes.
+
+## Safe mode quiz notes
+- Quiz runs inside the popup with 15 randomized questions (10 scored from personal facts, 5 unscored fun).
+- No correctness feedback per question; BirthdayBot makes snarky typed comments below the popup with typing sound + mouth animation.
+- Pass threshold: 80%+ on scored questions; otherwise fail.
+- Fail end card: "LIER DETECTED!" plus a typed threat; after delay, a GAME OVER overlay appears.
+- Pass end card: colorful waving "Wow! It's your birthday today! HURRAY!" plus a victory sound, followed by two typed angry messages.

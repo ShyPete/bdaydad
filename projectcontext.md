@@ -7,7 +7,7 @@ birthday.
 ## Current concept
 1) Data-collection adventure with branching responses (choose-your-own-adventure).
 2) Intentional, playful "broken app" moments (fake errors).
-3) Intro and crash-to-safe-mode sequence implemented; safe mode is a static landing screen for now.
+3) Intro and crash-to-safe-mode sequence implemented; safe mode leads into a popup quiz flow with pass/fail endings.
 
 ## Rough roadmap
 1) Intro: Present "BirthdayBot5000" that claims it can determine if today is the
@@ -30,8 +30,19 @@ birthday.
 - A steady 2000 Hz crash tone plays after the second message speech ends and
   stops when the reboot screen turns black.
 - Safe mode transition: 5-second crash overlay, then a black terminal window
-  prints reboot lines for 10 seconds, then a static screen says
-  "BIRTHDAYBOT5000 SAFE MODE." Terminal window is 50% larger and shows 27 lines.
+  prints reboot lines for 10 seconds, then a SAFE MODE screen with typed lines.
+  A Windows-style popup ("Birthday Quiz v1.0 - Title") appears after the safe-mode
+  messages, with a disabled start button until the final line finishes typing.
+- Popup quiz: 15 randomized questions (10 scored from personal facts, 5 unscored).
+  Each question has 3 options; no correct/incorrect feedback. BirthdayBot makes
+  snarky typed comments below the popup with typing sound and mouth animation.
+- Scoring: pass if 80%+ of scored questions are correct; otherwise fail.
+- Fail end: "LIER DETECTED!" end card in the popup, a typed threat below, then a
+  GAME OVER overlay.
+- Pass end: colorful wave-text end card ("Wow! It's your birthday today! HURRAY!"),
+  victory sound, then two angry typed BirthdayBot messages.
+- Popup window styling must remain consistent unless explicitly requested.
+- "Clear the popup window" means removing only the body content, not the title bar.
 - Ambient audio uses Web Audio with layered synths + percussive noise and a
   faster rhythm. Autoplay is attempted; if blocked, show an enable-sound prompt
   and a persistent toggle.
@@ -52,9 +63,8 @@ birthday.
 - Seasonal flavor assumes Northern Hemisphere.
 
 ## Near-term focus
-- Create the Safe Mode questionnaire (questions, branching, and pacing).
-- Build the question flow using Dad's interests.
-- Add the final birthday reveal scene.
+- Final birthday reveal scene after the quiz.
+- Polish transitions between quiz endings and finale.
 
 ## Goals
 - Make the flow delightful and personal.

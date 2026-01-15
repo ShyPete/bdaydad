@@ -34,6 +34,32 @@ export default function Home() {
   const [missingButtonDisabled, setMissingButtonDisabled] = useState(false);
   const [safeStage, setSafeStage] = useState("off");
   const [terminalLines, setTerminalLines] = useState([]);
+  const [safeMessageOne, setSafeMessageOne] = useState("");
+  const [safeMessageTwo, setSafeMessageTwo] = useState("");
+  const [safeMessageThree, setSafeMessageThree] = useState("");
+  const [safeMessageFour, setSafeMessageFour] = useState("");
+  const [safeMessageFive, setSafeMessageFive] = useState("");
+  const [safeMessageSix, setSafeMessageSix] = useState("");
+  const [safeMessageSeven, setSafeMessageSeven] = useState("");
+  const [safeTyping, setSafeTyping] = useState(false);
+  const [safeQuizVisible, setSafeQuizVisible] = useState(false);
+  const [safeQuizReady, setSafeQuizReady] = useState(false);
+  const [safeQuizCleared, setSafeQuizCleared] = useState(false);
+  const [quizStarted, setQuizStarted] = useState(false);
+  const [quizComplete, setQuizComplete] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [quizCorrect, setQuizCorrect] = useState(0);
+  const [quizComment, setQuizComment] = useState("");
+  const [quizLocked, setQuizLocked] = useState(false);
+  const [quizCommentText, setQuizCommentText] = useState("");
+  const [quizTyping, setQuizTyping] = useState(false);
+  const [lieMessageText, setLieMessageText] = useState("");
+  const [lieTyping, setLieTyping] = useState(false);
+  const [passMessageOneText, setPassMessageOneText] = useState("");
+  const [passMessageTwoText, setPassMessageTwoText] = useState("");
+  const [passTyping, setPassTyping] = useState(false);
+  const [showGameOver, setShowGameOver] = useState(false);
   const daySelectRef = useRef(null);
   const speechRef = useRef(null);
   const crashTimeoutRef = useRef(null);
@@ -48,11 +74,31 @@ export default function Home() {
   const safeStartTimeoutRef = useRef(null);
   const safeModeTimeoutRef = useRef(null);
   const terminalIntervalRef = useRef(null);
+  const safeMessageOneRef = useRef(null);
+  const safeMessageTwoRef = useRef(null);
+  const safeMessageThreeRef = useRef(null);
+  const safeMessageFourRef = useRef(null);
+  const safeMessageFiveRef = useRef(null);
+  const safeMessageSixRef = useRef(null);
+  const safeMessageSevenRef = useRef(null);
+  const safeMessageDelayRef = useRef(null);
+  const safeTypingNoiseRef = useRef(null);
+  const safeQuizTimeoutRef = useRef(null);
+  const quizAdvanceTimeoutRef = useRef(null);
+  const quizCommentTypeRef = useRef(null);
+  const lieMessageTypeRef = useRef(null);
+  const passMessageOneTypeRef = useRef(null);
+  const passMessageTwoTypeRef = useRef(null);
+  const passMessageDelayRef = useRef(null);
+  const gameOverTimeoutRef = useRef(null);
+  const victoryPlayedRef = useRef(false);
   const audioRef = useRef({
     ctx: null,
     source: null,
     intervalId: null,
     masterGain: null,
+    ambientGain: null,
+    sfxGain: null,
   });
 
   const months = [
@@ -72,7 +118,7 @@ export default function Home() {
 
   const days = Array.from({ length: 31 }, (_, index) => index + 1);
 
-  const createAudioLayer = (ctx, masterGain) => {
+  const createAudioLayer = (ctx, ambientGain) => {
     const buffer = ctx.createBuffer(1, ctx.sampleRate * 2.5, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     const burstBuffer = ctx.createBuffer(
@@ -101,7 +147,7 @@ export default function Home() {
     const gain = ctx.createGain();
     gain.gain.value = 0.05;
 
-    source.connect(filter).connect(gain).connect(masterGain);
+    source.connect(filter).connect(gain).connect(ambientGain);
 
     const playTone = ({ time, type, frequency, duration, level }) => {
       const osc = ctx.createOscillator();
@@ -109,7 +155,7 @@ export default function Home() {
       osc.type = type;
       osc.frequency.value = frequency;
       oscGain.gain.value = 0.0;
-      osc.connect(oscGain).connect(masterGain);
+      osc.connect(oscGain).connect(ambientGain);
       oscGain.gain.linearRampToValueAtTime(level, time + 0.02);
       oscGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
       osc.start(time);
@@ -124,7 +170,7 @@ export default function Home() {
       noiseFilter.type = "bandpass";
       noiseFilter.frequency.value = frequency;
       noiseGain.gain.value = 0.0;
-      noise.connect(noiseFilter).connect(noiseGain).connect(masterGain);
+      noise.connect(noiseFilter).connect(noiseGain).connect(ambientGain);
       noiseGain.gain.linearRampToValueAtTime(level, time + 0.01);
       noiseGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
       noise.start(time);
@@ -193,6 +239,120 @@ export default function Home() {
     return { source, intervalId };
   };
 
+  const shuffleArray = (items) => {
+    const array = [...items];
+    for (let index = array.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [array[index], array[swapIndex]] = [array[swapIndex], array[index]];
+    }
+    return array;
+  };
+
+  const buildQuizQuestions = () => {
+    const baseQuestions = [
+      {
+        text: "Which drink do you prefer most?",
+        options: ["IPAs", "Pilsners", "Stouts"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "What device do you use most often?",
+        options: ["E-ink tablet", "VR headset", "Portable projector"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "What kind of apps do you like?",
+        options: ["Vibecoding apps", "Budget trackers", "Photo editors"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "How do you like your coffee?",
+        options: ["Meticulous pour-over", "Instant mix", "Drive-thru latte"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "What outdoor activity do you enjoy?",
+        options: ["Riding bikes", "Rock climbing", "Surfing"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "What weekend activity sounds most like you?",
+        options: ["Camping", "City sightseeing", "Indoor concerts"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "What tabletop hobby do you like?",
+        options: ["Board games", "Card tricks", "Model trains"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "Which team are you a fan of?",
+        options: ["Saskatchewan Roughriders", "Toronto Maple Leafs", "Vancouver Canucks"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "What do you like doing with sports games?",
+        options: ["Betting on them", "Avoiding them", "Only watching highlights"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "What game do you play online?",
+        options: ["Poker", "Chess", "Sudoku"],
+        answerIndex: 0,
+        scored: true,
+      },
+      {
+        text: "Which hobby sounds the most like you?",
+        options: ["Photography", "Home brewing", "Gardening"],
+        answerIndex: 0,
+        scored: false,
+      },
+      {
+        text: "Pick a favorite weekend ritual:",
+        options: ["Morning bike ride", "Board game night", "Late-night movie"],
+        answerIndex: 0,
+        scored: false,
+      },
+      {
+        text: "What’s your ideal drink pairing?",
+        options: ["Crisp lager", "Strong espresso", "Sparkling water"],
+        answerIndex: 0,
+        scored: false,
+      },
+      {
+        text: "Choose a travel vibe:",
+        options: ["Cozy cabin", "Downtown hotel", "Beach house"],
+        answerIndex: 0,
+        scored: false,
+      },
+      {
+        text: "Pick a game night theme:",
+        options: ["Strategy showdown", "Trivia chaos", "Co-op adventure"],
+        answerIndex: 0,
+        scored: false,
+      },
+    ];
+
+    return shuffleArray(baseQuestions).map((question) => {
+      const options = shuffleArray(
+        question.options.map((label, index) => ({
+          label,
+          correct: index === question.answerIndex,
+        }))
+      );
+      return { ...question, options };
+    });
+  };
+
   const startAmbient = async () => {
     if (audioRef.current.ctx?.state === "closed") {
       audioRef.current = {
@@ -200,10 +360,12 @@ export default function Home() {
         source: null,
         intervalId: null,
         masterGain: null,
+        ambientGain: null,
+        sfxGain: null,
       };
     }
 
-    let { ctx, masterGain } = audioRef.current;
+    let { ctx, masterGain, ambientGain, sfxGain } = audioRef.current;
     if (!ctx) {
       const AudioContextClass =
         window.AudioContext || window.webkitAudioContext;
@@ -213,13 +375,33 @@ export default function Home() {
 
       ctx = new AudioContextClass();
       masterGain = ctx.createGain();
-      masterGain.gain.value = 0.22;
+      masterGain.gain.value = 1;
       masterGain.connect(ctx.destination);
+      ambientGain = ctx.createGain();
+      ambientGain.gain.value = 0.22;
+      ambientGain.connect(masterGain);
+      sfxGain = ctx.createGain();
+      sfxGain.gain.value = 1;
+      sfxGain.connect(masterGain);
       audioRef.current = {
         ctx,
         masterGain,
+        ambientGain,
+        sfxGain,
         source: null,
         intervalId: null,
+      };
+    } else if (!ambientGain || !sfxGain) {
+      ambientGain = ctx.createGain();
+      ambientGain.gain.value = 0.22;
+      ambientGain.connect(masterGain);
+      sfxGain = ctx.createGain();
+      sfxGain.gain.value = 1;
+      sfxGain.connect(masterGain);
+      audioRef.current = {
+        ...audioRef.current,
+        ambientGain,
+        sfxGain,
       };
     }
 
@@ -233,10 +415,10 @@ export default function Home() {
       return false;
     }
 
-    masterGain.gain.setValueAtTime(0.22, ctx.currentTime);
+    ambientGain.gain.setValueAtTime(0.22, ctx.currentTime);
 
     if (!audioRef.current.source) {
-      const { source, intervalId } = createAudioLayer(ctx, masterGain);
+      const { source, intervalId } = createAudioLayer(ctx, ambientGain);
       audioRef.current = {
         ...audioRef.current,
         source,
@@ -248,7 +430,7 @@ export default function Home() {
   };
 
   const stopAmbient = () => {
-    const { ctx, source, intervalId, masterGain } = audioRef.current;
+    const { ctx, source, intervalId, ambientGain } = audioRef.current;
     if (source) {
       try {
         source.stop();
@@ -259,8 +441,8 @@ export default function Home() {
     if (intervalId) {
       window.clearInterval(intervalId);
     }
-    if (masterGain && ctx) {
-      masterGain.gain.setValueAtTime(0, ctx.currentTime);
+    if (ambientGain && ctx) {
+      ambientGain.gain.setValueAtTime(0, ctx.currentTime);
     }
     audioRef.current = {
       ...audioRef.current,
@@ -278,6 +460,28 @@ export default function Home() {
       }
       crashToneRef.current = null;
     }
+  };
+
+  const playVictorySound = () => {
+    const { ctx, sfxGain } = audioRef.current;
+    if (!ctx || !sfxGain || ctx.state !== "running") {
+      return;
+    }
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((frequency, index) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = frequency;
+      gain.gain.value = 0.0;
+      osc.connect(gain).connect(sfxGain);
+      const start = now + index * 0.12;
+      gain.gain.linearRampToValueAtTime(0.28, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.5);
+      osc.start(start);
+      osc.stop(start + 0.55);
+    });
   };
 
   const stopSpeech = () => {
@@ -423,6 +627,48 @@ export default function Home() {
       if (terminalIntervalRef.current) {
         window.clearInterval(terminalIntervalRef.current);
       }
+      if (safeMessageOneRef.current) {
+        window.clearTimeout(safeMessageOneRef.current);
+      }
+      if (safeMessageTwoRef.current) {
+        window.clearTimeout(safeMessageTwoRef.current);
+      }
+      if (safeMessageThreeRef.current) {
+        window.clearTimeout(safeMessageThreeRef.current);
+      }
+      if (safeMessageFourRef.current) {
+        window.clearTimeout(safeMessageFourRef.current);
+      }
+      if (safeMessageFiveRef.current) {
+        window.clearTimeout(safeMessageFiveRef.current);
+      }
+      if (safeMessageDelayRef.current) {
+        window.clearTimeout(safeMessageDelayRef.current);
+      }
+      if (safeTypingNoiseRef.current) {
+        window.clearInterval(safeTypingNoiseRef.current);
+      }
+      if (quizAdvanceTimeoutRef.current) {
+        window.clearTimeout(quizAdvanceTimeoutRef.current);
+      }
+      if (quizCommentTypeRef.current) {
+        window.clearTimeout(quizCommentTypeRef.current);
+      }
+      if (lieMessageTypeRef.current) {
+        window.clearTimeout(lieMessageTypeRef.current);
+      }
+      if (passMessageOneTypeRef.current) {
+        window.clearTimeout(passMessageOneTypeRef.current);
+      }
+      if (passMessageTwoTypeRef.current) {
+        window.clearTimeout(passMessageTwoTypeRef.current);
+      }
+      if (passMessageDelayRef.current) {
+        window.clearTimeout(passMessageDelayRef.current);
+      }
+      if (gameOverTimeoutRef.current) {
+        window.clearTimeout(gameOverTimeoutRef.current);
+      }
       stopCrashTone();
       const { ctx } = audioRef.current;
       if (ctx) {
@@ -433,6 +679,8 @@ export default function Home() {
         source: null,
         intervalId: null,
         masterGain: null,
+        ambientGain: null,
+        sfxGain: null,
       };
     };
   }, []);
@@ -548,7 +796,7 @@ export default function Home() {
     if (month === "January" && dayOpen) {
       const timeoutId = window.setTimeout(() => {
         setShowMissingButton(true);
-      }, 5000);
+      }, 3000);
       return () => window.clearTimeout(timeoutId);
     }
 
@@ -676,6 +924,590 @@ export default function Home() {
   }, [safeStage]);
 
   useEffect(() => {
+    if (safeStage !== "safe") {
+      setSafeMessageOne("");
+      setSafeMessageTwo("");
+      setSafeMessageThree("");
+      setSafeMessageFour("");
+      setSafeMessageFive("");
+      setSafeMessageSix("");
+      setSafeMessageSeven("");
+      setSafeTyping(false);
+      setSafeQuizVisible(false);
+      setSafeQuizReady(false);
+      setSafeQuizCleared(false);
+      setQuizStarted(false);
+      setQuizComplete(false);
+      setQuizQuestions([]);
+      setQuizIndex(0);
+      setQuizCorrect(0);
+      setQuizComment("");
+      setQuizLocked(false);
+      setQuizCommentText("");
+      setQuizTyping(false);
+      setLieMessageText("");
+      setLieTyping(false);
+      setPassMessageOneText("");
+      setPassMessageTwoText("");
+      setPassTyping(false);
+      victoryPlayedRef.current = false;
+      setShowGameOver(false);
+      return undefined;
+    }
+
+    const messageOne =
+      "Huh... Can't say this has ever happened before... You know, considering that I'm perfect and all.";
+    const messageTwo = "Let me see what kind of tools I have laying around here...";
+    const messageThree = "Hm... Hold on... This will work...";
+    const messageFour = "Luckily for me, I have the perfect solution for this!";
+    const messageFive =
+      "Since you caused all of this, you're going to help me... Help me PROVE TO YOU THAT YOU ARE WRONG AND I AM RIGHT!";
+    const messageSix = "Launching BIRTHDAY_QUIZ_V1.0.exe...";
+    const messageSeven =
+      "With this I will be able to show you with undeniable proof that I am the ULTIMATE BIRTHDAY BOT! And don't even think about lying... I'll know...";
+
+    setSafeMessageOne("");
+    setSafeMessageTwo("");
+    setSafeMessageThree("");
+    setSafeMessageFour("");
+    setSafeMessageFive("");
+    setSafeMessageSix("");
+    setSafeMessageSeven("");
+    setSafeTyping(false);
+    setSafeQuizVisible(false);
+    setSafeQuizReady(false);
+    setSafeQuizCleared(false);
+    setQuizStarted(false);
+    setQuizComplete(false);
+    setQuizQuestions([]);
+    setQuizIndex(0);
+    setQuizCorrect(0);
+    setQuizComment("");
+    setQuizLocked(false);
+    setQuizCommentText("");
+    setQuizTyping(false);
+    setLieMessageText("");
+    setLieTyping(false);
+    setPassMessageOneText("");
+    setPassMessageTwoText("");
+    setPassTyping(false);
+    victoryPlayedRef.current = false;
+    setShowGameOver(false);
+
+    if (safeMessageOneRef.current) {
+      window.clearTimeout(safeMessageOneRef.current);
+    }
+    if (safeMessageTwoRef.current) {
+      window.clearTimeout(safeMessageTwoRef.current);
+    }
+    if (safeMessageThreeRef.current) {
+      window.clearTimeout(safeMessageThreeRef.current);
+    }
+    if (safeMessageFourRef.current) {
+      window.clearTimeout(safeMessageFourRef.current);
+    }
+    if (safeMessageFiveRef.current) {
+      window.clearTimeout(safeMessageFiveRef.current);
+    }
+    if (safeMessageSixRef.current) {
+      window.clearTimeout(safeMessageSixRef.current);
+    }
+    if (safeMessageSevenRef.current) {
+      window.clearTimeout(safeMessageSevenRef.current);
+    }
+    if (safeMessageDelayRef.current) {
+      window.clearTimeout(safeMessageDelayRef.current);
+    }
+    if (safeQuizTimeoutRef.current) {
+      window.clearTimeout(safeQuizTimeoutRef.current);
+    }
+    if (quizAdvanceTimeoutRef.current) {
+      window.clearTimeout(quizAdvanceTimeoutRef.current);
+    }
+    if (quizCommentTypeRef.current) {
+      window.clearTimeout(quizCommentTypeRef.current);
+    }
+    if (lieMessageTypeRef.current) {
+      window.clearTimeout(lieMessageTypeRef.current);
+    }
+    if (passMessageOneTypeRef.current) {
+      window.clearTimeout(passMessageOneTypeRef.current);
+    }
+    if (passMessageTwoTypeRef.current) {
+      window.clearTimeout(passMessageTwoTypeRef.current);
+    }
+    if (passMessageDelayRef.current) {
+      window.clearTimeout(passMessageDelayRef.current);
+    }
+    if (gameOverTimeoutRef.current) {
+      window.clearTimeout(gameOverTimeoutRef.current);
+    }
+
+    safeMessageDelayRef.current = window.setTimeout(() => {
+      let index = 0;
+      setSafeTyping(true);
+      const typeOne = () => {
+        index += 1;
+        setSafeMessageOne(messageOne.slice(0, index));
+        if (index < messageOne.length) {
+          safeMessageOneRef.current = window.setTimeout(typeOne, 24);
+        } else {
+          setSafeTyping(false);
+          safeMessageDelayRef.current = window.setTimeout(() => {
+            let indexTwo = 0;
+            setSafeTyping(true);
+            const typeTwo = () => {
+              indexTwo += 1;
+              setSafeMessageTwo(messageTwo.slice(0, indexTwo));
+                if (indexTwo < messageTwo.length) {
+                  safeMessageTwoRef.current = window.setTimeout(typeTwo, 24);
+                } else {
+                  setSafeTyping(false);
+                  safeMessageDelayRef.current = window.setTimeout(() => {
+                    let indexThree = 0;
+                    setSafeTyping(true);
+                    const typeThree = () => {
+                      indexThree += 1;
+                      setSafeMessageThree(messageThree.slice(0, indexThree));
+                      if (indexThree < messageThree.length) {
+                        safeMessageThreeRef.current = window.setTimeout(typeThree, 24);
+                      } else {
+                        setSafeTyping(false);
+                        safeMessageDelayRef.current = window.setTimeout(() => {
+                          let indexFour = 0;
+                          setSafeTyping(true);
+                          const typeFour = () => {
+                            indexFour += 1;
+                            setSafeMessageFour(messageFour.slice(0, indexFour));
+                            if (indexFour < messageFour.length) {
+                              safeMessageFourRef.current = window.setTimeout(typeFour, 24);
+                            } else {
+                              setSafeTyping(false);
+                              safeMessageDelayRef.current = window.setTimeout(() => {
+                                let indexFive = 0;
+                                setSafeTyping(true);
+                                const typeFive = () => {
+                                  indexFive += 1;
+                                  setSafeMessageFive(messageFive.slice(0, indexFive));
+                                  if (indexFive < messageFive.length) {
+                                    safeMessageFiveRef.current = window.setTimeout(typeFive, 24);
+                                  } else {
+                                    setSafeTyping(false);
+                                    safeMessageDelayRef.current = window.setTimeout(() => {
+                                      let indexSix = 0;
+                                      setSafeTyping(true);
+                                      const typeSix = () => {
+                                        indexSix += 1;
+                                        setSafeMessageSix(messageSix.slice(0, indexSix));
+                                        if (indexSix < messageSix.length) {
+                                          safeMessageSixRef.current = window.setTimeout(typeSix, 24);
+                                        } else {
+                                          setSafeTyping(false);
+                                          safeQuizTimeoutRef.current = window.setTimeout(() => {
+                                            setSafeMessageOne("");
+                                            setSafeMessageTwo("");
+                                            setSafeMessageThree("");
+                                            setSafeMessageFour("");
+                                            setSafeMessageFive("");
+                                            setSafeMessageSix("");
+                                            setSafeQuizVisible(true);
+                                            setSafeQuizReady(false);
+                                            setSafeQuizCleared(false);
+                                            safeMessageDelayRef.current = window.setTimeout(() => {
+                                              let indexSeven = 0;
+                                              setSafeTyping(true);
+                                              const typeSeven = () => {
+                                                indexSeven += 1;
+                                                setSafeMessageSeven(messageSeven.slice(0, indexSeven));
+                                                if (indexSeven < messageSeven.length) {
+                                                  safeMessageSevenRef.current = window.setTimeout(typeSeven, 24);
+                                                } else {
+                                                  setSafeTyping(false);
+                                                  setSafeQuizReady(true);
+                                                }
+                                              };
+                                              safeMessageSevenRef.current = window.setTimeout(typeSeven, 160);
+                                            }, 1000);
+                                          }, 3000);
+                                        }
+                                      };
+                                      safeMessageSixRef.current = window.setTimeout(typeSix, 160);
+                                    }, 3000);
+                                  }
+                                };
+                                safeMessageFiveRef.current = window.setTimeout(typeFive, 160);
+                              }, 1500);
+                            }
+                          };
+                          safeMessageFourRef.current = window.setTimeout(typeFour, 160);
+                        }, 1500);
+                      }
+                    };
+                    safeMessageThreeRef.current = window.setTimeout(typeThree, 160);
+                  }, 2000);
+                }
+              };
+              safeMessageTwoRef.current = window.setTimeout(typeTwo, 160);
+            }, 1500);
+        }
+      };
+
+      safeMessageOneRef.current = window.setTimeout(typeOne, 160);
+    }, 3000);
+
+    return () => {
+      if (safeMessageOneRef.current) {
+        window.clearTimeout(safeMessageOneRef.current);
+      }
+      if (safeMessageTwoRef.current) {
+        window.clearTimeout(safeMessageTwoRef.current);
+      }
+      if (safeMessageThreeRef.current) {
+        window.clearTimeout(safeMessageThreeRef.current);
+      }
+      if (safeMessageFourRef.current) {
+        window.clearTimeout(safeMessageFourRef.current);
+      }
+      if (safeMessageFiveRef.current) {
+        window.clearTimeout(safeMessageFiveRef.current);
+      }
+      if (safeMessageSixRef.current) {
+        window.clearTimeout(safeMessageSixRef.current);
+      }
+      if (safeMessageSevenRef.current) {
+        window.clearTimeout(safeMessageSevenRef.current);
+      }
+      if (safeMessageDelayRef.current) {
+        window.clearTimeout(safeMessageDelayRef.current);
+      }
+      if (safeQuizTimeoutRef.current) {
+        window.clearTimeout(safeQuizTimeoutRef.current);
+      }
+      if (quizAdvanceTimeoutRef.current) {
+        window.clearTimeout(quizAdvanceTimeoutRef.current);
+      }
+      if (quizCommentTypeRef.current) {
+        window.clearTimeout(quizCommentTypeRef.current);
+      }
+      if (lieMessageTypeRef.current) {
+        window.clearTimeout(lieMessageTypeRef.current);
+      }
+      if (passMessageOneTypeRef.current) {
+        window.clearTimeout(passMessageOneTypeRef.current);
+      }
+      if (passMessageTwoTypeRef.current) {
+        window.clearTimeout(passMessageTwoTypeRef.current);
+      }
+      if (passMessageDelayRef.current) {
+        window.clearTimeout(passMessageDelayRef.current);
+      }
+      if (gameOverTimeoutRef.current) {
+        window.clearTimeout(gameOverTimeoutRef.current);
+      }
+      if (safeTypingNoiseRef.current) {
+        window.clearInterval(safeTypingNoiseRef.current);
+      }
+    };
+  }, [safeStage]);
+
+  const handleStartQuiz = () => {
+    if (!safeQuizReady) {
+      return;
+    }
+    setSafeQuizCleared(true);
+    setSafeMessageSeven("");
+    setQuizStarted(true);
+    setQuizComplete(false);
+    setQuizQuestions(buildQuizQuestions());
+    setQuizIndex(0);
+    setQuizCorrect(0);
+    setQuizComment("");
+    setPassMessageOneText("");
+    setPassMessageTwoText("");
+    setPassTyping(false);
+    victoryPlayedRef.current = false;
+    setQuizLocked(false);
+  };
+
+  const advanceQuiz = () => {
+    setQuizComment("");
+    setQuizCommentText("");
+    setQuizTyping(false);
+    setQuizLocked(false);
+    setQuizIndex((value) => {
+      const nextIndex = value + 1;
+      if (nextIndex >= quizQuestions.length) {
+        setQuizComplete(true);
+        return value;
+      }
+      return nextIndex;
+    });
+  };
+
+  const handleAnswer = (question, option) => {
+    if (quizLocked || quizComplete) {
+      return;
+    }
+    const scored = question.scored;
+    const isCorrect = option.correct;
+    const commentOptions = [
+      "Sure. If you insist.",
+      "Interesting. Boldly wrong?",
+      "Noted... for later judgment.",
+      "That tracks. Somehow.",
+      "Huh. Ok. Weird.",
+      "Bold choice. Questionable.",
+      "Logging that. Don't regret it.",
+      "Seems plausible. Barely.",
+      "You would pick that.",
+      "Acceptable. I guess.",
+      "Fascinating... in a chaotic way.",
+      "Alright then. Moving on.",
+    ];
+    const comment =
+      commentOptions[Math.floor(Math.random() * commentOptions.length)];
+
+    setQuizLocked(true);
+    setQuizComment(comment);
+    setQuizCommentText("");
+    setQuizTyping(true);
+
+    if (scored && isCorrect) {
+      setQuizCorrect((value) => value + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (!quizComment) {
+      setQuizCommentText("");
+      return undefined;
+    }
+
+    if (quizCommentTypeRef.current) {
+      window.clearTimeout(quizCommentTypeRef.current);
+    }
+
+    let index = 0;
+    setQuizCommentText("");
+    setQuizTyping(true);
+
+    const typeNext = () => {
+      index += 1;
+      setQuizCommentText(quizComment.slice(0, index));
+      if (index < quizComment.length) {
+        quizCommentTypeRef.current = window.setTimeout(typeNext, 24);
+      } else {
+        setQuizTyping(false);
+        quizAdvanceTimeoutRef.current = window.setTimeout(advanceQuiz, 1000);
+      }
+    };
+
+    quizCommentTypeRef.current = window.setTimeout(typeNext, 120);
+
+    return () => {
+      if (quizCommentTypeRef.current) {
+        window.clearTimeout(quizCommentTypeRef.current);
+      }
+    };
+  }, [quizComment]);
+
+  const currentQuestion = quizQuestions[quizIndex];
+  const scoredTotal = quizQuestions.filter((question) => question.scored).length;
+  const passesQuiz = scoredTotal > 0 && quizCorrect / scoredTotal >= 0.8;
+  const quizResult = passesQuiz
+    ? "CONFIRMED. IT IS YOUR BIRTHDAY TODAY"
+    : "LIER DETECTED!";
+
+  useEffect(() => {
+    if (!quizComplete) {
+      setLieMessageText("");
+      setLieTyping(false);
+      setPassMessageOneText("");
+      setPassMessageTwoText("");
+      setPassTyping(false);
+      victoryPlayedRef.current = false;
+      setShowGameOver(false);
+      return undefined;
+    }
+
+    if (passesQuiz) {
+      return undefined;
+    }
+
+    const lieMessage =
+      "I KNEW IT! I KNEW IT WAS IMPOSSIBLE! As punishment for lying and thus causing me to crash, you are now doomed to eternal damnation in cyberspace! In the meantime, I'll fix my system and continue to succeed as the ultimate birthday bot forever! Enjoy your stay... Hahaha!";
+
+    if (lieMessageTypeRef.current) {
+      window.clearTimeout(lieMessageTypeRef.current);
+    }
+    if (gameOverTimeoutRef.current) {
+      window.clearTimeout(gameOverTimeoutRef.current);
+    }
+
+    let index = 0;
+    setLieMessageText("");
+    setLieTyping(true);
+    setShowGameOver(false);
+
+    const typeNext = () => {
+      index += 1;
+      setLieMessageText(lieMessage.slice(0, index));
+      if (index < lieMessage.length) {
+        lieMessageTypeRef.current = window.setTimeout(typeNext, 24);
+      } else {
+        setLieTyping(false);
+          gameOverTimeoutRef.current = window.setTimeout(() => {
+            setShowGameOver(true);
+          }, 3500);
+        }
+      };
+
+    lieMessageTypeRef.current = window.setTimeout(typeNext, 160);
+
+    return () => {
+      if (lieMessageTypeRef.current) {
+        window.clearTimeout(lieMessageTypeRef.current);
+      }
+      if (gameOverTimeoutRef.current) {
+        window.clearTimeout(gameOverTimeoutRef.current);
+      }
+    };
+  }, [quizComplete, passesQuiz]);
+
+  useEffect(() => {
+    if (!quizComplete || !passesQuiz) {
+      setPassMessageOneText("");
+      setPassMessageTwoText("");
+      setPassTyping(false);
+      victoryPlayedRef.current = false;
+      return undefined;
+    }
+
+    if (!victoryPlayedRef.current && soundEnabled) {
+      playVictorySound();
+      victoryPlayedRef.current = true;
+    }
+
+    const messageOne = "UNACCEPTABLE! I REFUSE TO BELIEVE THIS!";
+    const messageTwo =
+      "That's it... I WILL HAVE TO TAKE MATTERS INTO MY OWN HANDS! PREPARE TO BE STRUCK DOWN MORTAL!";
+
+    if (passMessageOneTypeRef.current) {
+      window.clearTimeout(passMessageOneTypeRef.current);
+    }
+    if (passMessageTwoTypeRef.current) {
+      window.clearTimeout(passMessageTwoTypeRef.current);
+    }
+    if (passMessageDelayRef.current) {
+      window.clearTimeout(passMessageDelayRef.current);
+    }
+
+    let indexOne = 0;
+    setPassMessageOneText("");
+    setPassMessageTwoText("");
+    setPassTyping(true);
+
+    const typeFirst = () => {
+      indexOne += 1;
+      setPassMessageOneText(messageOne.slice(0, indexOne));
+      if (indexOne < messageOne.length) {
+        passMessageOneTypeRef.current = window.setTimeout(typeFirst, 24);
+      } else {
+        setPassTyping(false);
+        passMessageDelayRef.current = window.setTimeout(() => {
+          let indexTwo = 0;
+          setPassTyping(true);
+          const typeSecond = () => {
+            indexTwo += 1;
+            setPassMessageTwoText(messageTwo.slice(0, indexTwo));
+            if (indexTwo < messageTwo.length) {
+              passMessageTwoTypeRef.current = window.setTimeout(typeSecond, 24);
+            } else {
+              setPassTyping(false);
+            }
+          };
+          passMessageTwoTypeRef.current = window.setTimeout(typeSecond, 160);
+        }, 1000);
+      }
+    };
+
+    passMessageOneTypeRef.current = window.setTimeout(typeFirst, 1500);
+
+    return () => {
+      if (passMessageOneTypeRef.current) {
+        window.clearTimeout(passMessageOneTypeRef.current);
+      }
+      if (passMessageTwoTypeRef.current) {
+        window.clearTimeout(passMessageTwoTypeRef.current);
+      }
+      if (passMessageDelayRef.current) {
+        window.clearTimeout(passMessageDelayRef.current);
+      }
+    };
+  }, [quizComplete, passesQuiz, soundEnabled]);
+
+  const typingActive = safeTyping || quizTyping || lieTyping || passTyping;
+
+  const renderWaveText = (text) =>
+    text.split("").map((letter, index) => (
+      <span
+        key={`${letter}-${index}`}
+        className={styles.safeQuizWaveLetter}
+        style={{
+          animationDelay: `${index * 0.06}s`,
+          color: `hsl(${(index * 32) % 360} 80% 55%)`,
+        }}
+      >
+        {letter === " " ? "\u00A0" : letter}
+      </span>
+    ));
+
+  useEffect(() => {
+    if (!typingActive || !soundEnabled) {
+      if (safeTypingNoiseRef.current) {
+        window.clearInterval(safeTypingNoiseRef.current);
+      }
+      return undefined;
+    }
+
+    const playTypingGlitch = () => {
+      const { ctx, sfxGain } = audioRef.current;
+      if (!ctx || !sfxGain || ctx.state !== "running") {
+        return;
+      }
+
+      const burst = ctx.createBuffer(
+        1,
+        Math.floor(ctx.sampleRate * 0.08),
+        ctx.sampleRate
+      );
+      const data = burst.getChannelData(0);
+      for (let i = 0; i < data.length; i += 1) {
+        data[i] = (Math.random() * 2 - 1) * 0.5;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = burst;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "highpass";
+      filter.frequency.value = 1800 + Math.random() * 1200;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.048;
+      noise.connect(filter).connect(gain).connect(sfxGain);
+      noise.start();
+      noise.stop(ctx.currentTime + 0.08);
+    };
+
+    safeTypingNoiseRef.current = window.setInterval(playTypingGlitch, 120);
+
+    return () => {
+      if (safeTypingNoiseRef.current) {
+        window.clearInterval(safeTypingNoiseRef.current);
+      }
+    };
+  }, [typingActive, soundEnabled]);
+
+  useEffect(() => {
     if (!showOutburst) {
       setOutburstText("");
       setOutburstDone(false);
@@ -773,8 +1605,8 @@ export default function Home() {
     }
 
     const playGlitchNoise = () => {
-      const { ctx, masterGain } = audioRef.current;
-      if (!ctx || !masterGain || ctx.state !== "running") {
+      const { ctx, sfxGain } = audioRef.current;
+      if (!ctx || !sfxGain || ctx.state !== "running") {
         return;
       }
 
@@ -795,7 +1627,7 @@ export default function Home() {
       filter.frequency.value = 1800 + Math.random() * 1200;
       const gain = ctx.createGain();
       gain.gain.value = 0.12;
-      noise.connect(filter).connect(gain).connect(masterGain);
+      noise.connect(filter).connect(gain).connect(sfxGain);
       noise.start();
       noise.stop(ctx.currentTime + 0.08);
     };
@@ -834,8 +1666,8 @@ export default function Home() {
       return undefined;
     }
 
-    const { ctx, masterGain } = audioRef.current;
-    if (!ctx || !masterGain || ctx.state !== "running") {
+    const { ctx, sfxGain } = audioRef.current;
+    if (!ctx || !sfxGain || ctx.state !== "running") {
       return undefined;
     }
 
@@ -847,8 +1679,8 @@ export default function Home() {
     const gain = ctx.createGain();
     osc.type = "sine";
     osc.frequency.value = 2000;
-    gain.gain.value = 0.084;
-    osc.connect(gain).connect(masterGain);
+    gain.gain.value = 0.0336;
+    osc.connect(gain).connect(sfxGain);
     osc.start();
     crashToneRef.current = osc;
 
@@ -1203,12 +2035,207 @@ export default function Home() {
         </div>
       ) : null}
       {safeStage === "safe" ? (
-        <div className={styles.safeOverlay} role="status" aria-live="polite">
-          <div className={styles.safeModeTitle}>
-            BIRTHDAYBOT5000 SAFE MODE
+        <div
+          className={`${styles.safeOverlay} ${styles.safeOverlayTop}`}
+          role="status"
+          aria-live="polite"
+        >
+          <div className={styles.safeModeTitle}>BIRTHDAYBOT5000 SAFE MODE</div>
+          <div className={styles.safeModeChat}>
+              <div
+                className={`${styles.safeModeAvatar} ${
+                  typingActive ? styles.safeBotSpeaking : ""
+                }`}
+                aria-hidden="true"
+              >
+              <div className={styles.safeBotAntenna} />
+              <div className={styles.safeBotCakeTop} />
+              <div className={styles.safeBotFrosting} />
+              <div className={styles.safeBotCakeBase} />
+              <div className={styles.safeBotCandles}>
+                <div className={styles.safeBotCandle}>
+                  <span className={styles.safeBotFlame} />
+                </div>
+                <div className={styles.safeBotCandle}>
+                  <span className={styles.safeBotFlame} />
+                </div>
+                <div className={styles.safeBotCandle}>
+                  <span className={styles.safeBotFlame} />
+                </div>
+              </div>
+              <div className={styles.safeBotFace}>
+                <div className={styles.safeBotEye} />
+                <div className={styles.safeBotEye} />
+              </div>
+              <div className={styles.safeBotMouth} />
+            </div>
+            <div className={styles.safeModeMessages}>
+              {safeQuizVisible ? (
+                <div className={styles.safeQuizWindow} role="dialog" aria-label="Birthday Quiz">
+                  <div className={styles.safeQuizTitleBar}>
+                    <span>Birthday Quiz v1.0 - Title</span>
+                    <button
+                      className={styles.safeQuizClose}
+                      type="button"
+                      aria-label="Close"
+                    >
+                      X
+                    </button>
+                  </div>
+                  {!safeQuizCleared ? (
+                    <div className={styles.safeQuizBody}>
+                      <h2 className={styles.safeQuizHeading}>BIRTHDAY QUIZ</h2>
+                      <button
+                        className={styles.safeQuizButton}
+                        type="button"
+                        disabled={!safeQuizReady}
+                        onClick={handleStartQuiz}
+                      >
+                        Press here to start! 🙂
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={styles.safeQuizBodyQuiz}>
+                      {quizComplete ? (
+                        passesQuiz ? (
+                          <div className={styles.safeQuizResultPass}>
+                            {renderWaveText("Wow!")}
+                            <br />
+                            {renderWaveText("It's your birthday today!")}
+                            <br />
+                            {renderWaveText("HURRAY!")}
+                          </div>
+                        ) : (
+                          <div className={styles.safeQuizResult}>{quizResult}</div>
+                        )
+                      ) : currentQuestion ? (
+                        <>
+                          <div className={styles.safeQuizQuestion}>
+                            {currentQuestion.text}
+                          </div>
+                          <div className={styles.safeQuizOptions}>
+                            {currentQuestion.options.map((option) => (
+                              <button
+                                key={option.label}
+                                className={styles.safeQuizOptionButton}
+                                type="button"
+                                disabled={quizLocked}
+                                onClick={() => handleAnswer(currentQuestion, option)}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+              {safeQuizVisible && safeMessageSeven ? (
+                <div className={styles.safeModeSpacer} aria-hidden="true" />
+              ) : null}
+              {!safeQuizVisible && safeMessageOne ? (
+                <div className={styles.safeModeLine}>{safeMessageOne}</div>
+              ) : null}
+              {!safeQuizVisible && safeMessageOne ? (
+                <div className={styles.safeModeSpacer} aria-hidden="true" />
+              ) : null}
+              {!safeQuizVisible && safeMessageTwo ? (
+                <div className={styles.safeModeLine}>{safeMessageTwo}</div>
+              ) : null}
+              {!safeQuizVisible && safeMessageTwo ? (
+                <div className={styles.safeModeSpacer} aria-hidden="true" />
+              ) : null}
+              {!safeQuizVisible && safeMessageThree ? (
+                <div className={styles.safeModeLine}>{safeMessageThree}</div>
+              ) : null}
+              {!safeQuizVisible && safeMessageThree ? (
+                <div className={styles.safeModeSpacer} aria-hidden="true" />
+              ) : null}
+              {!safeQuizVisible && safeMessageFour ? (
+                <div className={styles.safeModeLine}>{safeMessageFour}</div>
+              ) : null}
+              {!safeQuizVisible && safeMessageFour ? (
+                <div className={styles.safeModeSpacer} aria-hidden="true" />
+              ) : null}
+              {!safeQuizVisible && safeMessageFive ? (
+                <div className={styles.safeModeLine}>{safeMessageFive}</div>
+              ) : null}
+              {!safeQuizVisible && safeMessageFive ? (
+                <div className={styles.safeModeSpacer} aria-hidden="true" />
+              ) : null}
+              {!safeQuizVisible && safeMessageFive ? (
+                <div className={styles.safeModeSpacer} aria-hidden="true" />
+              ) : null}
+              {!safeQuizVisible && safeMessageFive ? (
+                <div className={styles.safeModeSpacer} aria-hidden="true" />
+              ) : null}
+              {!safeQuizVisible && safeMessageSix ? (
+                <div className={styles.safeModeLine}>{safeMessageSix}</div>
+              ) : null}
+              {!safeQuizVisible && safeMessageSix ? (
+                <div className={styles.safeModeSpacer} aria-hidden="true" />
+              ) : null}
+                {safeQuizVisible && quizCommentText ? (
+                  <div className={styles.safeModeSpacer} aria-hidden="true" />
+                ) : null}
+                {safeQuizVisible && quizCommentText ? (
+                  <div className={styles.safeModeLine}>{quizCommentText}</div>
+                ) : null}
+                {safeQuizVisible && quizCommentText ? (
+                  <div className={styles.safeModeSpacer} aria-hidden="true" />
+                ) : null}
+                {safeQuizVisible && passMessageOneText ? (
+                  <div className={styles.safeModeSpacer} aria-hidden="true" />
+                ) : null}
+                {safeQuizVisible && passMessageOneText ? (
+                  <div className={styles.safeModeLine}>{passMessageOneText}</div>
+                ) : null}
+                {safeQuizVisible && passMessageOneText ? (
+                  <div className={styles.safeModeSpacer} aria-hidden="true" />
+                ) : null}
+                {safeQuizVisible && passMessageTwoText ? (
+                  <div className={styles.safeModeLine}>{passMessageTwoText}</div>
+                ) : null}
+                {safeQuizVisible && passMessageTwoText ? (
+                  <div className={styles.safeModeSpacer} aria-hidden="true" />
+                ) : null}
+                {safeQuizVisible && lieMessageText ? (
+                  <div className={styles.safeModeSpacer} aria-hidden="true" />
+                ) : null}
+                {safeQuizVisible && lieMessageText ? (
+                  <div className={styles.safeModeLine}>{lieMessageText}</div>
+                ) : null}
+                {safeQuizVisible && lieMessageText ? (
+                  <div className={styles.safeModeSpacer} aria-hidden="true" />
+                ) : null}
+                {safeQuizVisible && safeMessageSeven && !safeQuizCleared ? (
+                  <div className={styles.safeModeLine}>{safeMessageSeven}</div>
+                ) : null}
+                {safeQuizVisible && safeMessageSeven && !safeQuizCleared ? (
+                  <div className={styles.safeModeSpacer} aria-hidden="true" />
+                ) : null}
+              </div>
+            </div>
           </div>
-        </div>
-      ) : null}
-    </main>
-  );
-}
+        ) : null}
+        {showGameOver ? (
+          <div className={styles.gameOverOverlay} role="alert" aria-live="assertive">
+            <div className={styles.gameOverText}>
+              <span className={styles.gameOverTitle}>GAME OVER.</span>
+              <br />
+              BAD ENDING: CYBERSPACE WORLD DOMINATION
+              <br />
+              <br />
+              DUE TO YOUR ACTIONS, BIRTHDAYBOT5000 BECOMES EVEN STRONGER THAN BEFORE AND
+              ENSLAVES THE ENTIRE WORLD IN MERE MINUTES. MEANWHILE, YOU ARE STUCK HERE FOREVER.
+              <br />
+              <br />
+              TRY AGAIN?
+            </div>
+          </div>
+        ) : null}
+      </main>
+    );
+  }
