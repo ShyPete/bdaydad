@@ -10,15 +10,18 @@ whenever scope, tone, or constraints change.
 ## Experience pillars
 - Choose-your-own-adventure flow that asks questions and branches on responses.
 - Lighthearted "fake broken" moments (intentional errors) that resolve quickly.
-- Target runtime: 3–5 minutes.
+- Target runtime: 3-5 minutes.
 - Current intro screen: "BirthdayBot5000" chat panel with cake-bot mascot and month/day selectors.
 - Trigger detail: Jan 17 is intentionally missing to kick off the "birthday not listed" crash flow.
+- Crash flow: "My birthday is not listed" triggers angry bot outburst, glitch, crash overlay, terminal reboot sequence, then SAFE MODE screen.
 - Ambient audio: Web Audio soundscape with layered synths + percussion; try autoplay, but show an enable-sound prompt and keep a visible toggle.
+- Crash audio: glitch bursts during panic + a steady tone between panic and reboot; stop audio on reboot screen.
 - Birthday analysis uses a server-side `/api/analyze` route that calls OpenAI via `OPENAI_API_KEY` (never from the client).
 - Analysis prompt lives in `prompts/prompts.json` for easy tuning and reuse.
 - Analyze responses vary via prompt modes/formats/toggles plus a client-side `variantSeed` for per-click variety.
 - Seasonal/astrology traits are hidden tone cues only; do not mention them explicitly.
-- BirthdayBot speaks responses aloud with browser TTS; the cake-bot animates while speaking.
+- BirthdayBot speaks responses aloud with browser TTS; the cake-bot animates while speaking and chat responses type out.
+- Current status: Intro, Initial prompt, and Fake crash are complete. Next: Safe mode questionnaire and Finale.
 
 ## Tone and style
 - Warm, funny, and a bit glitchy.
