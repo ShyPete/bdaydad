@@ -76,6 +76,8 @@ export default function Home() {
   const [safeBotFalling, setSafeBotFalling] = useState(false);
   const [quizCommentText, setQuizCommentText] = useState("");
   const [quizTyping, setQuizTyping] = useState(false);
+  const [freeformAnswer, setFreeformAnswer] = useState("");
+  const [freeformSubmitting, setFreeformSubmitting] = useState(false);
   const [lieMessageText, setLieMessageText] = useState("");
   const [lieTyping, setLieTyping] = useState(false);
   const [passMessageOneText, setPassMessageOneText] = useState("");
@@ -680,23 +682,34 @@ export default function Home() {
     return array;
   };
 
+  const limitWords = (text, maxWords) => {
+    const words = String(text || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (words.length <= maxWords) {
+      return words.join(" ");
+    }
+    return words.slice(0, maxWords).join(" ");
+  };
+
   const buildQuizQuestions = () => {
     const baseQuestions = [
       {
-        text: "Which drink do you prefer most?",
-        options: ["IPAs", "Pilsners", "Stouts"],
+        text: "Choose one drink; the other two disappear forever:",
+        options: ["IPAs", "Tim Horton's coffee with 10 milk & 10 sugar", "Pure bacon grease"],
         answerIndex: 0,
         scored: true,
       },
       {
-        text: "What device do you use most often?",
-        options: ["E-ink tablet", "VR headset", "Portable projector"],
+        text: "You're stranded on a deserted island, choose one device to take with you:",
+        options: ["E-ink tablet", "TV remote (batteries not included)", "Roger's router (cables not included)"],
         answerIndex: 0,
         scored: true,
       },
       {
-        text: "What kind of apps do you like?",
-        options: ["Vibecoding apps", "Budget trackers", "Photo editors"],
+        text: "Which kind of app do you like most?",
+        options: ["Vibecoding apps", "Parking apps", "Banking apps"],
         answerIndex: 0,
         scored: true,
       },
@@ -707,25 +720,25 @@ export default function Home() {
         scored: true,
       },
       {
-        text: "What outdoor activity do you enjoy?",
+        text: "Which is your preferred method for moving horizontally long distance?",
         options: ["Riding bikes", "Rock climbing", "Surfing"],
         answerIndex: 0,
         scored: true,
       },
       {
-        text: "What weekend activity sounds most like you?",
-        options: ["Camping", "City sightseeing", "Indoor concerts"],
+        text: "Which weekend activity sounds most like you?",
+        options: ["Camping", "Dumpster diving", "Crowded indoor concerts"],
         answerIndex: 0,
         scored: true,
       },
       {
-        text: "What tabletop hobby do you like?",
-        options: ["Board games", "Card tricks", "Model trains"],
+        text: "Which tabletop hobby do you like the most?",
+        options: ["Board games", "Sorting bags of Skittles by colour", "Speedrunning 3rd grade math workbooks"],
         answerIndex: 0,
         scored: true,
       },
       {
-        text: "Which team are you a fan of?",
+        text: "Which team is 'GOATed'?",
         options: ["Saskatchewan Roughriders", "Toronto Maple Leafs", "Vancouver Canucks"],
         answerIndex: 0,
         scored: true,
@@ -737,44 +750,48 @@ export default function Home() {
         scored: true,
       },
       {
-        text: "What game do you play online?",
-        options: ["Poker", "Chess", "Sudoku"],
+        text: "Which game would you rather play online?",
+        options: ["Poker", "Pay your bills simulator", "Watch paint dry (the game)"],
         answerIndex: 0,
         scored: true,
       },
       {
-        text: "Which hobby sounds the most like you?",
-        options: ["Photography", "Home brewing", "Gardening"],
-        answerIndex: 0,
+        text: "List the top 3 best farm animals:",
+        type: "freeform",
         scored: false,
       },
       {
-        text: "Pick a favorite weekend ritual:",
-        options: ["Morning bike ride", "Board game night", "Late-night movie"],
-        answerIndex: 0,
+        text: "If you were a small city in Saskatchewan with a population below 6,000 and an elevation of 480.10m, what would you call yourself?",
+        type: "freeform",
         scored: false,
       },
       {
-        text: "What’s your ideal drink pairing?",
-        options: ["Crisp lager", "Strong espresso", "Sparkling water"],
-        answerIndex: 0,
+        text: "If you owned a microbrewery, what would you name it?",
+        type: "freeform",
         scored: false,
       },
       {
-        text: "Choose a travel vibe:",
-        options: ["Cozy cabin", "Downtown hotel", "Beach house"],
-        answerIndex: 0,
+        text: "Pick a game you know you'd win against your son at if you were at a video game convention in Eastern USA:",
+        type: "freeform",
         scored: false,
       },
       {
-        text: "Pick a game night theme:",
-        options: ["Strategy showdown", "Trivia chaos", "Co-op adventure"],
-        answerIndex: 0,
+        text: "01011001 01101111 01110101 01110010 00100000 01100001 01100111 01100101?",
+        type: "freeform",
         scored: false,
+        alwaysLast: true,
       },
     ];
 
-    return shuffleArray(baseQuestions).map((question) => {
+    const tailQuestions = baseQuestions.filter((question) => question.alwaysLast);
+    const shuffledQuestions = shuffleArray(
+      baseQuestions.filter((question) => !question.alwaysLast)
+    );
+
+    return [...shuffledQuestions, ...tailQuestions].map((question) => {
+      if (!question.options) {
+        return question;
+      }
       const options = shuffleArray(
         question.options.map((label, index) => ({
           label,
@@ -2234,6 +2251,8 @@ export default function Home() {
     setQuizCorrect(0);
     setQuizComment("");
     setSelectedOption("");
+    setFreeformAnswer("");
+    setFreeformSubmitting(false);
     setPassMessageOneText("");
     setPassMessageTwoText("");
     setPassTyping(false);
@@ -2247,6 +2266,8 @@ export default function Home() {
     setQuizTyping(false);
     setQuizLocked(false);
     setSelectedOption("");
+    setFreeformAnswer("");
+    setFreeformSubmitting(false);
     setQuizIndex((value) => {
       const nextIndex = value + 1;
       if (nextIndex >= quizQuestions.length) {
@@ -2277,17 +2298,87 @@ export default function Home() {
       "Fascinating... in a chaotic way.",
       "Alright then. Moving on.",
     ];
-    const comment =
+    const fallbackComment =
       commentOptions[Math.floor(Math.random() * commentOptions.length)];
 
     setQuizLocked(true);
     setSelectedOption(option.label);
-    setQuizComment(comment);
+    setQuizComment("");
     setQuizCommentText("");
-    setQuizTyping(true);
+    setQuizTyping(false);
+    setFreeformSubmitting(true);
 
     if (scored && isCorrect) {
       setQuizCorrect((value) => value + 1);
+    }
+
+    fetch("/api/quiz-response", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: question.text,
+        answer: option.label,
+        variantSeed: createVariantSeed(),
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        const reply = data?.message || fallbackComment;
+        setQuizComment(limitWords(reply, 12));
+      })
+      .catch(() => {
+        setQuizComment(limitWords(fallbackComment, 12));
+      })
+      .finally(() => {
+        setFreeformSubmitting(false);
+      });
+  };
+
+  const handleFreeformSubmit = async (event) => {
+    event.preventDefault();
+    if (quizLocked || quizComplete || !currentQuestion) {
+      return;
+    }
+    const answer = freeformAnswer.trim();
+    if (!answer) {
+      return;
+    }
+    setQuizLocked(true);
+    setSelectedOption("");
+    setQuizComment("");
+    setQuizCommentText("");
+    setQuizTyping(false);
+    setFreeformSubmitting(true);
+
+    if (currentQuestion.alwaysLast) {
+      const isNumeric = /^\s*\d+(\.\d+)?\s*$/.test(answer);
+      const reply = isNumeric
+        ? `So you're ${answer}? Bold number. I see the wear and tear.`
+        : "Binary asked your age. You answered chaos. Classic.";
+      setQuizComment(limitWords(reply, 12));
+      setFreeformSubmitting(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/quiz-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: currentQuestion.text,
+          answer,
+          variantSeed: createVariantSeed(),
+        }),
+      });
+      const data = await response.json();
+      const reply =
+        data?.message ||
+        "Huh. I expected better input, but fine. Moving on.";
+      setQuizComment(limitWords(reply, 12));
+    } catch (error) {
+      setQuizComment(limitWords("That response glitched out. Try again? Just kidding.", 12));
+    } finally {
+      setFreeformSubmitting(false);
     }
   };
 
@@ -2317,7 +2408,7 @@ export default function Home() {
       } else {
         setQuizTyping(false);
         (commentSpeech || Promise.resolve()).then(() => {
-          quizAdvanceTimeoutRef.current = window.setTimeout(advanceQuiz, 1000);
+          quizAdvanceTimeoutRef.current = window.setTimeout(advanceQuiz, 330);
         });
       }
     };
@@ -2792,12 +2883,19 @@ export default function Home() {
 
   const creditsLines = [
     "CREDITS:",
+    "",
     "Project Manager - Simon",
+    "",
     "Vibe Coders - Noah, Simon",
+    "",
     "Chef - Juliana",
+    "",
     "Funding - Anni, Ferris",
+    "",
     "Bug Fixer, Songwriter, Sound Designer, Cat Wrangler - Mom",
+    "",
     "Playtesters - Jacky, Mikaela, Yuuya",
+    "",
     "No bots were hurt in the creation of this experience",
   ];
 
@@ -3560,23 +3658,50 @@ export default function Home() {
                           <div className={styles.safeQuizQuestion}>
                             {currentQuestion.text}
                           </div>
-                          <div className={styles.safeQuizOptions}>
-                            {currentQuestion.options.map((option) => (
+                          {currentQuestion.type === "freeform" ? (
+                            <form
+                              className={styles.safeQuizFreeform}
+                              onSubmit={handleFreeformSubmit}
+                            >
+                              <textarea
+                                className={styles.safeQuizFreeformInput}
+                                value={freeformAnswer}
+                                onChange={(event) => setFreeformAnswer(event.target.value)}
+                                placeholder="Type your answer..."
+                                rows={3}
+                                disabled={quizLocked || freeformSubmitting}
+                              />
                               <button
-                                key={option.label}
-                                className={`${styles.safeQuizOptionButton} ${
-                                  selectedOption === option.label
-                                    ? styles.safeQuizOptionSelected
-                                    : ""
-                                }`}
-                                type="button"
-                                disabled={quizLocked}
-                                onClick={() => handleAnswer(currentQuestion, option)}
+                                className={styles.safeQuizFreeformButton}
+                                type="submit"
+                                disabled={
+                                  quizLocked ||
+                                  freeformSubmitting ||
+                                  !freeformAnswer.trim()
+                                }
                               >
-                                {option.label}
+                                Submit answer
                               </button>
-                            ))}
-                          </div>
+                            </form>
+                          ) : (
+                            <div className={styles.safeQuizOptions}>
+                              {currentQuestion.options.map((option) => (
+                                <button
+                                  key={option.label}
+                                  className={`${styles.safeQuizOptionButton} ${
+                                    selectedOption === option.label
+                                      ? styles.safeQuizOptionSelected
+                                      : ""
+                                  }`}
+                                  type="button"
+                                  disabled={quizLocked}
+                                  onClick={() => handleAnswer(currentQuestion, option)}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </>
                       ) : null}
                     </div>
@@ -3794,3 +3919,5 @@ export default function Home() {
       </main>
     );
   }
+
+

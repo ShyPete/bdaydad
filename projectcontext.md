@@ -57,7 +57,11 @@ birthday.
   before the final birthday shout. The boss shakes on defeat, then slides offscreen;
   the final shout is centered, multicolored, free-floating, split into two lines,
   and has a subtle translucent backing.
-- After the final shout, a timed button appears to launch a scrolling credits screen.
+- After the final shout, a timed button appears to launch a scrolling credits screen
+  that starts closer to the bottom so lines show faster.
+- Quiz updates: 5 freeform text questions (unscored) interleaved with MCQs; all quiz
+  responses come from `/api/quiz-response` and are hard-limited to 12 words. The
+  binary “Your age?” question is forced last with custom numeric/non-numeric responses.
 - Quiz buttons have hover/focus states and a visible selected state.
 - Browser tab title is "BirthdayBot5000"; favicon uses the BirthdayBot icon.
 - Popup window styling must remain consistent unless explicitly requested.

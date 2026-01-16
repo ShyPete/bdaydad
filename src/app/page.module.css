@@ -199,6 +199,56 @@
   gap: 0.7rem;
 }
 
+.safeQuizFreeform {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.safeQuizFreeformInput {
+  width: 100%;
+  min-height: 90px;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid #8a8a8a;
+  border-radius: 6px;
+  background: #f1f1f1;
+  font-family: "Tahoma", "Trebuchet MS", sans-serif;
+  font-size: 0.95rem;
+  color: #000000;
+  resize: vertical;
+}
+
+.safeQuizFreeformInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.safeQuizFreeformButton {
+  justify-self: start;
+  background: #f1f1f1;
+  border: 2px solid #8a8a8a;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.95rem;
+  color: #000000;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.safeQuizFreeformButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.safeQuizFreeformButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #3b79c5;
+  box-shadow: 0 6px 10px rgba(30, 90, 168, 0.25);
+}
+
+.safeQuizFreeformButton:focus-visible {
+  outline: 2px solid #3b79c5;
+  outline-offset: 2px;
+}
+
 .safeQuizOptionButton {
   background: #f1f1f1;
   border: 2px solid #8a8a8a;
@@ -1393,7 +1443,7 @@
 
 @keyframes creditsRoll {
   0% {
-    transform: translateY(110vh);
+    transform: translateY(60vh);
   }
   100% {
     transform: translateY(-130vh);

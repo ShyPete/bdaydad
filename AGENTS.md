@@ -58,4 +58,5 @@ whenever scope, tone, or constraints change.
 - Quiz buttons have hover/focus states and show the selected answer.
 - Browser tab title is "BirthdayBot5000" and the favicon is the BirthdayBot icon.
 - Terminal boot lines render top-down without reflow spacing between earlier lines.
-- Credits: after the final shout, a timed button appears to open a scrolling credits roll.
+- Credits: after the final shout, a timed button appears to open a scrolling credits roll (starts closer to the bottom for faster visibility).
+- Quiz updates: 5 freeform text questions (unscored) interleaved with MCQs; MCQ and freeform replies come from `/api/quiz-response` and are hard-limited to 12 words. Binary question is always last with custom response handling.
