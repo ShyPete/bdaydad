@@ -58,7 +58,7 @@ export default function Home() {
   const [safeBotSpeaking, setSafeBotSpeaking] = useState(false);
   const [safeBotAngry, setSafeBotAngry] = useState(false);
   const [bossPhase, setBossPhase] = useState("off");
-  const [bossHealth, setBossHealth] = useState(3);
+  const [bossHealth, setBossHealth] = useState(6);
   const [bossProjectiles, setBossProjectiles] = useState([]);
   const [bossHitFlash, setBossHitFlash] = useState(false);
   const [bossHitText, setBossHitText] = useState("");
@@ -69,6 +69,10 @@ export default function Home() {
   const [bossDeathLine, setBossDeathLine] = useState("");
   const [bossFinalLine, setBossFinalLine] = useState("");
   const [bossSpeechDone, setBossSpeechDone] = useState(false);
+  const [bossFallOut, setBossFallOut] = useState(false);
+  const [bossHudVisible, setBossHudVisible] = useState(true);
+  const [showCreditsButton, setShowCreditsButton] = useState(false);
+  const [showCreditsScreen, setShowCreditsScreen] = useState(false);
   const [safeBotFalling, setSafeBotFalling] = useState(false);
   const [quizCommentText, setQuizCommentText] = useState("");
   const [quizTyping, setQuizTyping] = useState(false);
@@ -118,6 +122,8 @@ export default function Home() {
   const bossHitTimeoutRef = useRef(null);
   const bossHitTextTimeoutRef = useRef(null);
   const bossProjectileIdRef = useRef(0);
+  const bossFinalTimeoutRef = useRef(null);
+  const creditsTimeoutRef = useRef(null);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const victoryPlayedRef = useRef(false);
   // Shared Web Audio graph; reused across ambient/safe/boss/victory layers.
@@ -2487,7 +2493,7 @@ export default function Home() {
     }
 
     setBossPhase("off");
-    setBossHealth(3);
+    setBossHealth(6);
     setBossProjectiles([]);
     setBossHitFlash(false);
     setBossHitText("");
@@ -2498,6 +2504,10 @@ export default function Home() {
     setBossDeathLine("");
     setBossFinalLine("");
     setSafeBotFalling(false);
+    setBossFallOut(false);
+    setBossHudVisible(true);
+    setShowCreditsButton(false);
+    setShowCreditsScreen(false);
     bossSpeechQueueRef.current = Promise.resolve();
     return undefined;
   }, [quizComplete, passesQuiz]);
@@ -2529,6 +2539,20 @@ export default function Home() {
     }
 
     bossIntroTimeoutRef.current = window.setTimeout(() => {
+      setSafeMessageOne("");
+      setSafeMessageTwo("");
+      setSafeMessageThree("");
+      setSafeMessageFour("");
+      setSafeMessageFive("");
+      setSafeMessageSix("");
+      setSafeMessageSeven("");
+      setSafeQuizVisible(false);
+      setSafeQuizReady(false);
+      setSafeQuizCleared(false);
+      setQuizCommentText("");
+      setPassMessageOneText("");
+      setPassMessageTwoText("");
+      setLieMessageText("");
       setBossPhase("intro");
     }, 900);
 
@@ -2544,7 +2568,7 @@ export default function Home() {
       return undefined;
     }
 
-    setBossHealth(3);
+    setBossHealth(6);
     setBossProjectiles([]);
     setBossHitText("");
     setBossHitFlash(false);
@@ -2553,6 +2577,11 @@ export default function Home() {
     setBossEyesDead(false);
     setBossDeathLine("");
     setBossFinalLine("");
+    setBossHudVisible(true);
+    setBossFallOut(false);
+    setShowCreditsButton(false);
+    setShowCreditsScreen(false);
+    setBossHudVisible(true);
     bossSpeechQueueRef.current = Promise.resolve();
 
     if (soundEnabled) {
@@ -2663,13 +2692,14 @@ export default function Home() {
     }
 
     bossSpeechQueueRef.current = Promise.resolve();
-    const deathIntro = "arrrghghghghh";
-    const deathScream = "noooooooooooooooo";
+    const deathIntro = "Arrrghghghghh";
+    const deathScream = "Noooooooooooooooo";
     const deathLine =
-      "nooo! I.... Then i'm forced to admit... it is your birthday... but this isn't the last you've seen of me";
+      "Nooo! I..... then I'm forced to admit... it is your birthday... but this isn't the last you've seen of me...";
     const finalLine = "HAPPY\u00A0BIRTHDAY\u00A0DAD!!!\nFROM NOAH & SIMON";
     setBossDeathLine(deathIntro);
     setBossFinalLine("");
+    setBossHudVisible(true);
 
     queueBossSpeech(deathIntro)
       .then(() => {
@@ -2681,8 +2711,16 @@ export default function Home() {
         return queueBossSpeech(deathLine);
       })
       .then(() => {
-        setBossFinalLine(finalLine);
-        return queueBossSpeech(finalLine);
+        setBossFallOut(true);
+        if (bossFinalTimeoutRef.current) {
+          window.clearTimeout(bossFinalTimeoutRef.current);
+        }
+        bossFinalTimeoutRef.current = window.setTimeout(() => {
+          setBossDeathLine("");
+          setBossHudVisible(false);
+          setBossFinalLine(finalLine);
+          queueBossSpeech(finalLine);
+        }, 900);
       });
 
     return undefined;
@@ -2702,8 +2740,17 @@ export default function Home() {
     setBossEyesDead(false);
     setBossDeathLine("");
     setBossFinalLine("");
+    setBossFallOut(false);
+    setShowCreditsButton(false);
+    setShowCreditsScreen(false);
     if (bossHitTextTimeoutRef.current) {
       window.clearTimeout(bossHitTextTimeoutRef.current);
+    }
+    if (bossFinalTimeoutRef.current) {
+      window.clearTimeout(bossFinalTimeoutRef.current);
+    }
+    if (creditsTimeoutRef.current) {
+      window.clearTimeout(creditsTimeoutRef.current);
     }
     return undefined;
   }, [bossPhase]);
@@ -2723,9 +2770,49 @@ export default function Home() {
     }
   }, [bossPhase, soundEnabled]);
 
+  useEffect(() => {
+    if (!bossFinalLine || bossPhase !== "defeated" || showCreditsScreen) {
+      setShowCreditsButton(false);
+      if (creditsTimeoutRef.current) {
+        window.clearTimeout(creditsTimeoutRef.current);
+      }
+      return undefined;
+    }
+
+    creditsTimeoutRef.current = window.setTimeout(() => {
+      setShowCreditsButton(true);
+    }, 3000);
+
+    return () => {
+      if (creditsTimeoutRef.current) {
+        window.clearTimeout(creditsTimeoutRef.current);
+      }
+    };
+  }, [bossFinalLine, bossPhase, showCreditsScreen]);
+
+  const creditsLines = [
+    "CREDITS:",
+    "Project Manager - Simon",
+    "Vibe Coders - Noah, Simon",
+    "Chef - Juliana",
+    "Funding - Anni, Ferris",
+    "Bug Fixer, Songwriter, Sound Designer, Cat Wrangler - Mom",
+    "Playtesters - Jacky, Mikaela, Yuuya",
+    "No bots were hurt in the creation of this experience",
+  ];
+
+  const handleShowCredits = () => {
+    setShowCreditsButton(false);
+    setShowCreditsScreen(true);
+    setBossDeathLine("");
+    setBossFinalLine("");
+    setBossHudVisible(false);
+  };
+
   // Aggregate typing state to drive shared SFX and bot animation.
   const typingNoiseActive = safeTyping || quizTyping || lieTyping || passTyping;
   const typingActive = typingNoiseActive || safeBotSpeaking;
+  const showSafeModeUI = bossPhase === "off" || bossPhase === "drop";
 
   const renderWaveText = (text) =>
     text.split("").map((letter, index) => (
@@ -3392,8 +3479,10 @@ export default function Home() {
           role="status"
           aria-live="polite"
         >
-          <div className={styles.safeModeTitle}>BIRTHDAYBOT5000 SAFE MODE</div>
-          <div className={styles.safeModeChat}>
+          {showSafeModeUI ? (
+            <>
+              <div className={styles.safeModeTitle}>BIRTHDAYBOT5000 SAFE MODE</div>
+              <div className={styles.safeModeChat}>
               <div
                 className={`${styles.safeModeAvatar} ${
                   typingActive ? styles.safeBotSpeaking : ""
@@ -3580,19 +3669,23 @@ export default function Home() {
                 ) : null}
               </div>
             </div>
+            </>
+          ) : null}
           </div>
         ) : null}
-        {bossPhase !== "off" && bossPhase !== "drop" ? (
+        {bossPhase !== "off" && bossPhase !== "drop" && !showCreditsScreen ? (
           <div className={styles.bossOverlay} role="presentation">
-            <div className={styles.bossHud}>
-              <span className={styles.bossHudTitle}>MECHA BIRTHDAYBOT</span>
-              <div className={styles.bossHealthBar}>
-                <div
-                  className={styles.bossHealthFill}
-                  style={{ width: `${(bossHealth / 3) * 100}%` }}
-                />
+            {bossHudVisible ? (
+              <div className={styles.bossHud}>
+                <span className={styles.bossHudTitle}>MECHA BIRTHDAYBOT</span>
+                <div className={styles.bossHealthBar}>
+                  <div
+                    className={styles.bossHealthFill}
+                    style={{ width: `${(bossHealth / 6) * 100}%` }}
+                  />
+                </div>
               </div>
-            </div>
+            ) : null}
             <div className={styles.bossArena}>
               <div
                 className={`${styles.bossBot} ${
@@ -3601,7 +3694,9 @@ export default function Home() {
                   bossFire ? styles.bossBotFire : ""
                 } ${bossExplode ? styles.bossBotExplode : ""} ${
                   bossEyesDead ? styles.bossBotDead : ""
-                } ${bossSpeaking ? styles.bossBotSpeaking : ""}`}
+                } ${bossSpeaking ? styles.bossBotSpeaking : ""} ${
+                  bossPhase === "defeated" && !bossFallOut ? styles.bossBotShake : ""
+                } ${bossFallOut ? styles.bossBotFallOut : ""}`}
                 role="button"
                 tabIndex={0}
                 onClick={handleBossHit}
@@ -3657,6 +3752,26 @@ export default function Home() {
               {bossFinalLine ? (
                 <div className={styles.bossFinalText}>{bossFinalLine}</div>
               ) : null}
+            </div>
+          </div>
+        ) : null}
+        {showCreditsButton ? (
+          <button
+            className={styles.creditsButton}
+            type="button"
+            onClick={handleShowCredits}
+          >
+            Press here to view credits
+          </button>
+        ) : null}
+        {showCreditsScreen ? (
+          <div className={styles.creditsOverlay} role="presentation">
+            <div className={styles.creditsScroll}>
+              {creditsLines.map((line, index) => (
+                <div key={`${line}-${index}`} className={styles.creditsLine}>
+                  {line}
+                </div>
+              ))}
             </div>
           </div>
         ) : null}

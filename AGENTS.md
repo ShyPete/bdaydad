@@ -21,12 +21,12 @@ whenever scope, tone, or constraints change.
 - Sound toggle stays visible in safe mode/quiz (higher z-index); intro ambient does not play in safe mode.
 - Safe mode/quiz lines use TTS that begins as the text starts typing and trigger the green bot speaking animation (angry brows when appropriate).
 - Safe mode/quiz waits for each spoken line to finish before printing the next (0.15s gap), and typing SFX stop when typing ends.
-- Boss finale: after the pass speech, the safe-mode bot drops offscreen with a crash SFX, the mecha BirthdayBot rises in, shoots larger fast-tracking projectiles, and takes 3 clicks to defeat. Hits play SFX + "oof/ouch"; death triggers an explosion effect + flames, X eyes, and a spoken sequence ("arrrghghghghh" -> "noooooooooooooooo" -> death line) before the final birthday shout. Boss fight music is faster and more intense; the final shout is centered, multicolored, free-floating, and split into two lines, and has a subtle translucent backing.
+- Boss finale: after the pass speech, the safe-mode bot drops offscreen with a crash SFX, the mecha BirthdayBot rises in, shoots larger fast-tracking projectiles, and takes 6 clicks to defeat. Hits play SFX + "oof/ouch"; death triggers an explosion effect + flames, X eyes, and a spoken sequence (capitalized/punctuated) before the final birthday shout. Boss shakes on defeat, then slides offscreen before the final shout. Boss fight music is faster and more intense; the final shout is centered, multicolored, free-floating, and split into two lines, with a subtle translucent backing.
 - Analysis prompt lives in `prompts/prompts.json` for easy tuning and reuse.
 - Analyze responses vary via prompt modes/formats/toggles plus a client-side `variantSeed` for per-click variety.
 - Seasonal/astrology traits are hidden tone cues only; do not mention them explicitly.
 - BirthdayBot speaks responses aloud with browser TTS; the cake-bot animates while speaking and chat responses type out.
-- Current status: Safe mode terminal + popup quiz flow implemented with randomized questions, scoring, pass/fail endings, and the boss finale.
+- Current status: Safe mode terminal + popup quiz flow implemented with randomized questions, scoring, pass/fail endings, polished boss finale, and credits scene.
 - Shortcuts: `?safe=1` jumps to the green terminal boot screen; `?quiz=1` (or `?quiz=true`) jumps to SAFE MODE + quiz; `?quiz=pass` / `?quiz=fail` jump to quiz endings.
 
 ## Tone and style
@@ -58,3 +58,4 @@ whenever scope, tone, or constraints change.
 - Quiz buttons have hover/focus states and show the selected answer.
 - Browser tab title is "BirthdayBot5000" and the favicon is the BirthdayBot icon.
 - Terminal boot lines render top-down without reflow spacing between earlier lines.
+- Credits: after the final shout, a timed button appears to open a scrolling credits roll.

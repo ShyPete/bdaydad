@@ -1040,6 +1040,14 @@
   animation: bossRise 0.9s cubic-bezier(0.2, 0.85, 0.2, 1) both;
 }
 
+.bossBotShake {
+  animation: bossShake 0.45s ease-in-out infinite;
+}
+
+.bossBotFallOut {
+  animation: bossFallOut 0.9s ease-in forwards;
+}
+
 .bossHitFlash {
   filter: brightness(1.4);
 }
@@ -1332,6 +1340,90 @@
   }
   to {
     transform: translateY(0) scale(1);
+  }
+}
+
+.creditsButton {
+  position: fixed;
+  bottom: 3.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.75rem 1.6rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: rgba(16, 18, 28, 0.85);
+  color: #fdf7ef;
+  font-family: "Space Mono", "Courier New", monospace;
+  font-size: 0.95rem;
+  cursor: pointer;
+  z-index: 12;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.creditsButton:hover {
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.creditsOverlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 13;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-family: "Space Mono", "Courier New", monospace;
+  color: #fdf7ef;
+}
+
+.creditsScroll {
+  position: absolute;
+  width: min(720px, 90vw);
+  text-align: center;
+  animation: creditsRoll 26s linear forwards;
+}
+
+.creditsLine {
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0.8rem 0;
+}
+
+@keyframes creditsRoll {
+  0% {
+    transform: translateY(110vh);
+  }
+  100% {
+    transform: translateY(-130vh);
+  }
+}
+
+@keyframes bossShake {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  20% {
+    transform: translateX(-6px) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateX(6px) rotate(1.2deg);
+  }
+  80% {
+    transform: translateX(-4px) rotate(-1deg);
+  }
+}
+
+@keyframes bossFallOut {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(140vh);
+    opacity: 0;
   }
 }
 

@@ -48,14 +48,16 @@ birthday.
 - Scoring: pass if 80%+ of scored questions are correct; otherwise fail.
 - Fail end: "LIER DETECTED!" end card in the popup, a typed threat below, then a
   GAME OVER overlay.
-- Pass end: colorful wave-text end card ("Wow! It's your birthday today! HURRAY!"),
+- Pass end: colorful wave-text end card ("Wow! / It's your birthday today! / HURRAY!"),
   victory sound, then two angry typed BirthdayBot messages.
 - Boss finale (quiz pass): after the pass speech, the safe-mode bot drops offscreen
   with a crash SFX, a mecha BirthdayBot rises in, shoots larger fast-tracking
-  projectiles, and takes 3 clicks to defeat. Hits play SFX + "oof/ouch"; death
-  triggers an explosion effect + flames, X eyes, and a spoken sequence
-  ("arrrghghghghh" -> "noooooooooooooooo" -> death line) before the final birthday shout,
-  which is centered, multicolored, free-floating, split into two lines, and has a subtle translucent backing.
+  projectiles, and takes 6 clicks to defeat. Hits play SFX + "oof/ouch"; death
+  triggers an explosion effect + flames, X eyes, and a spoken, punctuated sequence
+  before the final birthday shout. The boss shakes on defeat, then slides offscreen;
+  the final shout is centered, multicolored, free-floating, split into two lines,
+  and has a subtle translucent backing.
+- After the final shout, a timed button appears to launch a scrolling credits screen.
 - Quiz buttons have hover/focus states and a visible selected state.
 - Browser tab title is "BirthdayBot5000"; favicon uses the BirthdayBot icon.
 - Popup window styling must remain consistent unless explicitly requested.
