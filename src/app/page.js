@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
 
 export default function Home() {
+  // Single-page state machine for intro -> crash -> safe mode -> quiz -> boss finale.
   const [month, setMonth] = useState("");
   const [day, setDay] = useState("");
   const [dayOpen, setDayOpen] = useState(false);
@@ -33,6 +34,7 @@ export default function Home() {
   const [confusionSpeechDone, setConfusionSpeechDone] = useState(false);
   const [missingButtonDisabled, setMissingButtonDisabled] = useState(false);
   const [safeStage, setSafeStage] = useState("off");
+  const [safeModeShortcut, setSafeModeShortcut] = useState(null);
   const [terminalLines, setTerminalLines] = useState([]);
   const [safeMessageOne, setSafeMessageOne] = useState("");
   const [safeMessageTwo, setSafeMessageTwo] = useState("");
@@ -52,6 +54,22 @@ export default function Home() {
   const [quizCorrect, setQuizCorrect] = useState(0);
   const [quizComment, setQuizComment] = useState("");
   const [quizLocked, setQuizLocked] = useState(false);
+  const [selectedOption, setSelectedOption] = useState("");
+  const [safeBotSpeaking, setSafeBotSpeaking] = useState(false);
+  const [safeBotAngry, setSafeBotAngry] = useState(false);
+  const [bossPhase, setBossPhase] = useState("off");
+  const [bossHealth, setBossHealth] = useState(3);
+  const [bossProjectiles, setBossProjectiles] = useState([]);
+  const [bossHitFlash, setBossHitFlash] = useState(false);
+  const [bossHitText, setBossHitText] = useState("");
+  const [bossSpeaking, setBossSpeaking] = useState(false);
+  const [bossFire, setBossFire] = useState(false);
+  const [bossExplode, setBossExplode] = useState(false);
+  const [bossEyesDead, setBossEyesDead] = useState(false);
+  const [bossDeathLine, setBossDeathLine] = useState("");
+  const [bossFinalLine, setBossFinalLine] = useState("");
+  const [bossSpeechDone, setBossSpeechDone] = useState(false);
+  const [safeBotFalling, setSafeBotFalling] = useState(false);
   const [quizCommentText, setQuizCommentText] = useState("");
   const [quizTyping, setQuizTyping] = useState(false);
   const [lieMessageText, setLieMessageText] = useState("");
@@ -91,7 +109,18 @@ export default function Home() {
   const passMessageTwoTypeRef = useRef(null);
   const passMessageDelayRef = useRef(null);
   const gameOverTimeoutRef = useRef(null);
+  const safeSpeechQueueRef = useRef(Promise.resolve());
+  const bossSpeechQueueRef = useRef(Promise.resolve());
+  const bossIntroTimeoutRef = useRef(null);
+  const bossBattleTimeoutRef = useRef(null);
+  const bossShootIntervalRef = useRef(null);
+  const bossTickRef = useRef(null);
+  const bossHitTimeoutRef = useRef(null);
+  const bossHitTextTimeoutRef = useRef(null);
+  const bossProjectileIdRef = useRef(0);
+  const mousePosRef = useRef({ x: 0, y: 0 });
   const victoryPlayedRef = useRef(false);
+  // Shared Web Audio graph; reused across ambient/safe/boss/victory layers.
   const audioRef = useRef({
     ctx: null,
     source: null,
@@ -99,6 +128,12 @@ export default function Home() {
     masterGain: null,
     ambientGain: null,
     sfxGain: null,
+    safeGain: null,
+    safeIntervalId: null,
+    bossGain: null,
+    bossIntervalId: null,
+    victoryGain: null,
+    victoryIntervalId: null,
   });
 
   const months = [
@@ -118,6 +153,20 @@ export default function Home() {
 
   const days = Array.from({ length: 31 }, (_, index) => index + 1);
 
+  // Utility for adding distortion to harsher synth textures.
+  const makeDistortionCurve = (amount = 25) => {
+    const sampleCount = 44100;
+    const curve = new Float32Array(sampleCount);
+    const deg = Math.PI / 180;
+    for (let i = 0; i < sampleCount; i += 1) {
+      const x = (i * 2) / sampleCount - 1;
+      curve[i] =
+        ((3 + amount) * x * 20 * deg) / (Math.PI + amount * Math.abs(x));
+    }
+    return curve;
+  };
+
+  // Ambient intro sound bed with randomized pops to keep it lively.
   const createAudioLayer = (ctx, ambientGain) => {
     const buffer = ctx.createBuffer(1, ctx.sampleRate * 2.5, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -237,6 +286,383 @@ export default function Home() {
     const intervalId = window.setInterval(schedulePop, 1000);
 
     return { source, intervalId };
+  };
+
+  // Safe mode loop: retro 8-bit castle vibe to signal danger.
+  const createSafeModeLayer = (ctx, safeGain) => {
+    const tempo = 107;
+    const beat = 60 / tempo;
+    const bar = beat * 4;
+    const chordRoots = [40, 41, 43, 41]; // E, F, G, F (Phrygian feel)
+    const leadOffsets = [0, 1, 0, 5, 3, 1, -2, -4];
+    const distortionCurve = makeDistortionCurve(50);
+
+    const noiseBuffer = ctx.createBuffer(
+      1,
+      Math.floor(ctx.sampleRate * 0.1),
+      ctx.sampleRate
+    );
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseData.length; i += 1) {
+      noiseData[i] = (Math.random() * 2 - 1) * 0.7;
+    }
+
+    const midiToFreq = (note) => 440 * Math.pow(2, (note - 69) / 12);
+
+    const playOrganStab = (root, time) => {
+      const duration = beat * 0.6;
+      const notes = [root, root + 7, root + 12, root + 1];
+      const chordGain = ctx.createGain();
+      chordGain.gain.value = 0.0001;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 1100;
+      chordGain.connect(filter).connect(safeGain);
+      chordGain.gain.setValueAtTime(0.0001, time);
+      chordGain.gain.linearRampToValueAtTime(0.22, time + 0.03);
+      chordGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+      notes.forEach((note, index) => {
+        const osc = ctx.createOscillator();
+        const body = ctx.createOscillator();
+        osc.type = "square";
+        body.type = "triangle";
+        osc.frequency.value = midiToFreq(note);
+        body.frequency.value = midiToFreq(note);
+        osc.detune.value = index % 2 === 0 ? -10 : 10;
+        osc.connect(chordGain);
+        body.connect(chordGain);
+        osc.start(time);
+        body.start(time);
+        osc.stop(time + duration + 0.05);
+        body.stop(time + duration + 0.05);
+      });
+
+      const sub = ctx.createOscillator();
+      sub.type = "triangle";
+      sub.frequency.value = midiToFreq(root - 12);
+      sub.connect(chordGain);
+      sub.start(time);
+      sub.stop(time + duration + 0.05);
+    };
+
+    const playOrganStep = (note, time) => {
+      const duration = beat * 0.85;
+      const osc = ctx.createOscillator();
+      const body = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const shaper = ctx.createWaveShaper();
+      const filter = ctx.createBiquadFilter();
+      osc.type = "square";
+      body.type = "square";
+      osc.frequency.value = midiToFreq(note);
+      body.frequency.value = midiToFreq(note - 12);
+      shaper.curve = distortionCurve;
+      shaper.oversample = "4x";
+      filter.type = "lowpass";
+      filter.frequency.value = 1000;
+      gain.gain.value = 0.0;
+      osc.connect(shaper);
+      body.connect(shaper);
+      shaper.connect(filter).connect(gain).connect(safeGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.12, time + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      osc.start(time);
+      body.start(time);
+      osc.stop(time + duration + 0.08);
+      body.stop(time + duration + 0.08);
+    };
+
+    const playLead = (note, time, duration, level = 0.12) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const shaper = ctx.createWaveShaper();
+      const filter = ctx.createBiquadFilter();
+      osc.type = "sawtooth";
+      osc.frequency.value = midiToFreq(note);
+      shaper.curve = distortionCurve;
+      shaper.oversample = "4x";
+      filter.type = "lowpass";
+      filter.frequency.value = 1500;
+      gain.gain.value = 0.0;
+      osc.connect(shaper).connect(filter).connect(gain).connect(safeGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(level, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      osc.start(time);
+      osc.stop(time + duration + 0.05);
+    };
+
+    const playKick = (note, time) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = midiToFreq(note);
+      gain.gain.value = 0.0;
+      osc.connect(gain).connect(safeGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.2, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+      osc.start(time);
+      osc.stop(time + 0.45);
+    };
+
+    const playCrunch = (time) => {
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.value = 1200 + Math.random() * 600;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0;
+      noise.connect(filter).connect(gain).connect(safeGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.16, time + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+      noise.start(time);
+      noise.stop(time + 0.14);
+    };
+
+    let step = 0;
+    const scheduleBar = () => {
+      const now = ctx.currentTime + 0.05;
+      const root = chordRoots[step % chordRoots.length];
+      const stepNotes = [root + 7, root + 8, root + 10, root + 8];
+      stepNotes.forEach((note, index) => {
+        playOrganStep(note, now + index * beat);
+      });
+      for (let i = 0; i < 4; i += 1) {
+        const beatTime = now + i * beat;
+        playOrganStab(root, beatTime);
+        playKick(root - 12, beatTime);
+        playCrunch(beatTime + beat * 0.25);
+      }
+
+      leadOffsets.forEach((offset, index) => {
+        const note = root + 24 + offset;
+        const start = now + index * (beat / 2);
+        playLead(note, start, beat * 0.4, 0.11);
+      });
+
+      step += 1;
+    };
+
+    scheduleBar();
+    const intervalId = window.setInterval(scheduleBar, bar * 1000);
+    return { intervalId };
+  };
+
+  // Boss fight loop: higher tempo and heavier layers.
+  const createBossLayer = (ctx, bossGain) => {
+    const tempo = 152;
+    const beat = 60 / tempo;
+    const bar = beat * 4;
+    const distortionCurve = makeDistortionCurve(80);
+
+    const noiseBuffer = ctx.createBuffer(
+      1,
+      Math.floor(ctx.sampleRate * 0.12),
+      ctx.sampleRate
+    );
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseData.length; i += 1) {
+      noiseData[i] = (Math.random() * 2 - 1) * 0.7;
+    }
+
+    const midiToFreq = (note) => 440 * Math.pow(2, (note - 69) / 12);
+
+    const playKick = (time) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 54;
+      gain.gain.value = 0.0;
+      osc.connect(gain).connect(bossGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.26, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+      osc.start(time);
+      osc.stop(time + 0.4);
+    };
+
+    const playSnare = (time) => {
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.value = 1800;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0;
+      noise.connect(filter).connect(gain).connect(bossGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.2, time + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+      noise.start(time);
+      noise.stop(time + 0.2);
+    };
+
+    const playHat = (time) => {
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "highpass";
+      filter.frequency.value = 6800;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0;
+      noise.connect(filter).connect(gain).connect(bossGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.06, time + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+      noise.start(time);
+      noise.stop(time + 0.1);
+    };
+
+    const playBass = (note, time) => {
+      const osc = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      const freq = midiToFreq(note);
+      osc.type = "sawtooth";
+      osc2.type = "square";
+      osc.frequency.value = freq;
+      osc2.frequency.value = freq;
+      filter.type = "lowpass";
+      filter.frequency.value = 240;
+      gain.gain.value = 0.0;
+      osc.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain).connect(bossGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.18, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + beat * 0.9);
+      osc.start(time);
+      osc2.start(time);
+      osc.stop(time + beat);
+      osc2.stop(time + beat);
+    };
+
+    const playStab = (notes, time) => {
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      gain.gain.value = 0.0;
+      filter.type = "lowpass";
+      filter.frequency.value = 1300;
+      filter.connect(gain).connect(bossGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.16, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + beat * 0.9);
+      notes.forEach((note) => {
+        const osc = ctx.createOscillator();
+        const shaper = ctx.createWaveShaper();
+        osc.type = "sawtooth";
+        osc.frequency.value = midiToFreq(note);
+        shaper.curve = distortionCurve;
+        shaper.oversample = "4x";
+        osc.connect(shaper).connect(filter);
+        osc.start(time);
+        osc.stop(time + beat);
+      });
+    };
+
+    const playLead = (note, time) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const shaper = ctx.createWaveShaper();
+      const filter = ctx.createBiquadFilter();
+      osc.type = "sawtooth";
+      osc.frequency.value = midiToFreq(note);
+      shaper.curve = distortionCurve;
+      shaper.oversample = "4x";
+      filter.type = "lowpass";
+      filter.frequency.value = 1700;
+      gain.gain.value = 0.0;
+      osc.connect(shaper).connect(filter).connect(gain).connect(bossGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.12, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + beat * 0.5);
+      osc.start(time);
+      osc.stop(time + beat * 0.6);
+    };
+
+    const leadPattern = [52, 55, 52, 58, 55, 52, 47, 45];
+    const bassPattern = [40, 40, 43, 45, 40, 40, 43, 38];
+    const stabChords = [
+      [40, 47],
+      [43, 50],
+    ];
+
+    const scheduleBar = () => {
+      const now = ctx.currentTime + 0.05;
+      playKick(now);
+      playKick(now + beat);
+      playKick(now + beat * 2);
+      playKick(now + beat * 3);
+      playSnare(now + beat * 1.5);
+      playSnare(now + beat * 3.5);
+
+      for (let i = 0; i < 8; i += 1) {
+        playHat(now + i * (beat / 2));
+      }
+      playStab(stabChords[0], now);
+      playStab(stabChords[1], now + beat * 2);
+
+      leadPattern.forEach((note, index) => {
+        playLead(note, now + index * (beat / 2));
+      });
+
+      bassPattern.forEach((note, index) => {
+        playBass(note, now + index * (beat / 2));
+      });
+    };
+
+    scheduleBar();
+    const intervalId = window.setInterval(scheduleBar, bar * 1000);
+    return { intervalId };
+  };
+
+  // Victory loop: bright celebratory chords.
+  const createVictoryLayer = (ctx, victoryGain) => {
+    const tempo = 120;
+    const beat = 60 / tempo;
+    const bar = beat * 4;
+    const chords = [
+      [60, 64, 67],
+      [62, 65, 69],
+      [57, 60, 64],
+      [55, 59, 62],
+    ];
+    const midiToFreq = (note) => 440 * Math.pow(2, (note - 69) / 12);
+
+    const playChord = (notes, time) => {
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0;
+      gain.connect(victoryGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.2, time + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + beat * 2.6);
+      notes.forEach((note) => {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.value = midiToFreq(note);
+        osc.connect(gain);
+        osc.start(time);
+        osc.stop(time + beat * 2.6);
+      });
+    };
+
+    let step = 0;
+    const scheduleBar = () => {
+      const now = ctx.currentTime + 0.05;
+      const chord = chords[step % chords.length];
+      playChord(chord, now);
+      step += 1;
+    };
+
+    scheduleBar();
+    const intervalId = window.setInterval(scheduleBar, bar * 1000);
+    return { intervalId };
   };
 
   const shuffleArray = (items) => {
@@ -362,6 +788,12 @@ export default function Home() {
         masterGain: null,
         ambientGain: null,
         sfxGain: null,
+        safeGain: null,
+        safeIntervalId: null,
+        bossGain: null,
+        bossIntervalId: null,
+        victoryGain: null,
+        victoryIntervalId: null,
       };
     }
 
@@ -388,8 +820,14 @@ export default function Home() {
         masterGain,
         ambientGain,
         sfxGain,
+        safeGain: null,
         source: null,
         intervalId: null,
+        safeIntervalId: null,
+        bossGain: null,
+        bossIntervalId: null,
+        victoryGain: null,
+        victoryIntervalId: null,
       };
     } else if (!ambientGain || !sfxGain) {
       ambientGain = ctx.createGain();
@@ -451,6 +889,353 @@ export default function Home() {
     };
   };
 
+  const startSafeModeAudio = async () => {
+    if (audioRef.current.ctx?.state === "closed") {
+      audioRef.current = {
+        ctx: null,
+        source: null,
+        intervalId: null,
+        masterGain: null,
+        ambientGain: null,
+        sfxGain: null,
+        safeGain: null,
+        safeIntervalId: null,
+        bossGain: null,
+        bossIntervalId: null,
+        victoryGain: null,
+        victoryIntervalId: null,
+      };
+    }
+
+    let { ctx, masterGain, ambientGain, sfxGain, safeGain } = audioRef.current;
+    if (!ctx) {
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        return false;
+      }
+
+      ctx = new AudioContextClass();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 1;
+      masterGain.connect(ctx.destination);
+      ambientGain = ctx.createGain();
+      ambientGain.gain.value = 0.22;
+      ambientGain.connect(masterGain);
+      sfxGain = ctx.createGain();
+      sfxGain.gain.value = 1;
+      sfxGain.connect(masterGain);
+      safeGain = ctx.createGain();
+      safeGain.gain.value = 0.2;
+      safeGain.connect(masterGain);
+      audioRef.current = {
+        ctx,
+        masterGain,
+        ambientGain,
+        sfxGain,
+        safeGain,
+        source: null,
+        intervalId: null,
+        safeIntervalId: null,
+        bossGain: null,
+        bossIntervalId: null,
+        victoryGain: null,
+        victoryIntervalId: null,
+      };
+    } else if (!safeGain) {
+      safeGain = ctx.createGain();
+      safeGain.gain.value = 0.2;
+      safeGain.connect(masterGain);
+      audioRef.current = {
+        ...audioRef.current,
+        safeGain,
+      };
+    }
+
+    try {
+      await ctx.resume();
+    } catch (error) {
+      return false;
+    }
+
+    if (ctx.state !== "running") {
+      return false;
+    }
+
+    safeGain.gain.setValueAtTime(0.2, ctx.currentTime);
+
+    if (!audioRef.current.safeIntervalId) {
+      const { intervalId } = createSafeModeLayer(ctx, safeGain);
+      audioRef.current = {
+        ...audioRef.current,
+        safeIntervalId: intervalId,
+      };
+    }
+
+    return true;
+  };
+
+  const stopSafeModeAudio = () => {
+    const { ctx, safeIntervalId, safeGain } = audioRef.current;
+    if (safeIntervalId) {
+      window.clearInterval(safeIntervalId);
+    }
+    if (safeGain && ctx) {
+      safeGain.gain.setValueAtTime(0, ctx.currentTime);
+    }
+    audioRef.current = {
+      ...audioRef.current,
+      safeIntervalId: null,
+    };
+  };
+
+  const startBossModeAudio = async () => {
+    let { ctx, masterGain, ambientGain, sfxGain, bossGain } = audioRef.current;
+    if (!ctx) {
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        return false;
+      }
+      ctx = new AudioContextClass();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 1;
+      masterGain.connect(ctx.destination);
+      ambientGain = ctx.createGain();
+      ambientGain.gain.value = 0.22;
+      ambientGain.connect(masterGain);
+      sfxGain = ctx.createGain();
+      sfxGain.gain.value = 1;
+      sfxGain.connect(masterGain);
+      bossGain = ctx.createGain();
+      bossGain.gain.value = 0.22;
+      bossGain.connect(masterGain);
+      audioRef.current = {
+        ctx,
+        masterGain,
+        ambientGain,
+        sfxGain,
+        safeGain: null,
+        safeIntervalId: null,
+        bossGain,
+        bossIntervalId: null,
+        victoryGain: null,
+        victoryIntervalId: null,
+        source: null,
+        intervalId: null,
+      };
+    } else if (!bossGain) {
+      bossGain = ctx.createGain();
+      bossGain.gain.value = 0.22;
+      bossGain.connect(masterGain);
+      audioRef.current = {
+        ...audioRef.current,
+        bossGain,
+      };
+    }
+
+    try {
+      await ctx.resume();
+    } catch (error) {
+      return false;
+    }
+
+    if (ctx.state !== "running") {
+      return false;
+    }
+
+    bossGain.gain.setValueAtTime(0.22, ctx.currentTime);
+    if (!audioRef.current.bossIntervalId) {
+      const { intervalId } = createBossLayer(ctx, bossGain);
+      audioRef.current = {
+        ...audioRef.current,
+        bossIntervalId: intervalId,
+      };
+    }
+
+    return true;
+  };
+
+  const stopBossModeAudio = () => {
+    const { ctx, bossIntervalId, bossGain } = audioRef.current;
+    if (bossIntervalId) {
+      window.clearInterval(bossIntervalId);
+    }
+    if (bossGain && ctx) {
+      bossGain.gain.setValueAtTime(0, ctx.currentTime);
+    }
+    audioRef.current = {
+      ...audioRef.current,
+      bossIntervalId: null,
+    };
+  };
+
+  const startVictoryAudio = async () => {
+    let { ctx, masterGain, ambientGain, sfxGain, victoryGain } = audioRef.current;
+    if (!ctx) {
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        return false;
+      }
+      ctx = new AudioContextClass();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 1;
+      masterGain.connect(ctx.destination);
+      ambientGain = ctx.createGain();
+      ambientGain.gain.value = 0.22;
+      ambientGain.connect(masterGain);
+      sfxGain = ctx.createGain();
+      sfxGain.gain.value = 1;
+      sfxGain.connect(masterGain);
+      victoryGain = ctx.createGain();
+      victoryGain.gain.value = 0.2;
+      victoryGain.connect(masterGain);
+      audioRef.current = {
+        ctx,
+        masterGain,
+        ambientGain,
+        sfxGain,
+        safeGain: null,
+        safeIntervalId: null,
+        bossGain: null,
+        bossIntervalId: null,
+        victoryGain,
+        victoryIntervalId: null,
+        source: null,
+        intervalId: null,
+      };
+    } else if (!victoryGain) {
+      victoryGain = ctx.createGain();
+      victoryGain.gain.value = 0.2;
+      victoryGain.connect(masterGain);
+      audioRef.current = {
+        ...audioRef.current,
+        victoryGain,
+      };
+    }
+
+    try {
+      await ctx.resume();
+    } catch (error) {
+      return false;
+    }
+
+    if (ctx.state !== "running") {
+      return false;
+    }
+
+    victoryGain.gain.setValueAtTime(0.2, ctx.currentTime);
+    if (!audioRef.current.victoryIntervalId) {
+      const { intervalId } = createVictoryLayer(ctx, victoryGain);
+      audioRef.current = {
+        ...audioRef.current,
+        victoryIntervalId: intervalId,
+      };
+    }
+    return true;
+  };
+
+  const stopVictoryAudio = () => {
+    const { ctx, victoryIntervalId, victoryGain } = audioRef.current;
+    if (victoryIntervalId) {
+      window.clearInterval(victoryIntervalId);
+    }
+    if (victoryGain && ctx) {
+      victoryGain.gain.setValueAtTime(0, ctx.currentTime);
+    }
+    audioRef.current = {
+      ...audioRef.current,
+      victoryIntervalId: null,
+    };
+  };
+
+  const playBossCrashSound = () => {
+    const { ctx, sfxGain } = audioRef.current;
+    if (!ctx || !sfxGain || ctx.state !== "running") {
+      return;
+    }
+    const now = ctx.currentTime;
+    const noise = ctx.createBuffer(1, ctx.sampleRate * 0.25, ctx.sampleRate);
+    const data = noise.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) {
+      data[i] = (Math.random() * 2 - 1) * 0.7;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = noise;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 1200;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.0;
+    source.connect(filter).connect(gain).connect(sfxGain);
+    gain.gain.linearRampToValueAtTime(0.28, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    source.start(now);
+    source.stop(now + 0.4);
+  };
+
+  const playBossShootSound = () => {
+    const { ctx, sfxGain } = audioRef.current;
+    if (!ctx || !sfxGain || ctx.state !== "running") {
+      return;
+    }
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.value = 660;
+    gain.gain.value = 0.0;
+    osc.connect(gain).connect(sfxGain);
+    gain.gain.linearRampToValueAtTime(0.1, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  };
+
+  const playBossHitSound = () => {
+    const { ctx, sfxGain } = audioRef.current;
+    if (!ctx || !sfxGain || ctx.state !== "running") {
+      return;
+    }
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = 220;
+    gain.gain.value = 0.0;
+    osc.connect(gain).connect(sfxGain);
+    gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  };
+
+  const playBossExplosionSound = () => {
+    const { ctx, sfxGain } = audioRef.current;
+    if (!ctx || !sfxGain || ctx.state !== "running") {
+      return;
+    }
+    const now = ctx.currentTime;
+    const noise = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
+    const data = noise.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) {
+      data[i] = (Math.random() * 2 - 1) * 0.8;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = noise;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 900;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.0;
+    source.connect(filter).connect(gain).connect(sfxGain);
+    gain.gain.linearRampToValueAtTime(0.32, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    source.start(now);
+    source.stop(now + 0.7);
+  };
+
   const stopCrashTone = () => {
     if (crashToneRef.current) {
       try {
@@ -484,6 +1269,7 @@ export default function Home() {
     });
   };
 
+  // Cancel any in-flight speech to avoid overlapping voices.
   const stopSpeech = () => {
     if (typeof window === "undefined" || !window.speechSynthesis) {
       return;
@@ -504,6 +1290,7 @@ export default function Home() {
 
     stopSpeech();
 
+    // Strip asterisks so TTS doesn't read them aloud.
     const sanitizedMessage = message.replace(/\*/g, "").replace(/\s+/g, " ").trim();
     const utterance = new SpeechSynthesisUtterance(sanitizedMessage);
     const availableVoices = synth.getVoices();
@@ -534,6 +1321,81 @@ export default function Home() {
 
     speechRef.current = utterance;
     synth.speak(utterance);
+    if (synth.paused) {
+      try {
+        synth.resume();
+      } catch (error) {
+        // Ignore resume failures; fallback timers handle stuck speech.
+      }
+    }
+  };
+
+  // Serialize safe-mode speech so lines finish before the next begins.
+  const queueSafeSpeech = (message, { angry = false } = {}) => {
+    const run = () =>
+      new Promise((resolve) => {
+        const canSpeak =
+          soundEnabled &&
+          typeof window !== "undefined" &&
+          window.speechSynthesis &&
+          typeof window.SpeechSynthesisUtterance !== "undefined";
+        if (!canSpeak) {
+          resolve();
+          return;
+        }
+        setSafeBotSpeaking(true);
+        setSafeBotAngry(angry);
+        speakMessage(message, {
+          onEnd: () => {
+            setSafeBotSpeaking(false);
+            setSafeBotAngry(false);
+            resolve();
+          },
+        });
+      });
+    const next = safeSpeechQueueRef.current.then(run).catch(() => {});
+    safeSpeechQueueRef.current = next;
+    return next;
+  };
+
+  // Boss speech queue with a fallback timer in case TTS stalls.
+  const queueBossSpeech = (message) => {
+    const run = () =>
+      new Promise((resolve) => {
+        const canSpeak =
+          soundEnabled &&
+          typeof window !== "undefined" &&
+          window.speechSynthesis &&
+          typeof window.SpeechSynthesisUtterance !== "undefined";
+        if (!canSpeak) {
+          resolve();
+          return;
+        }
+        let resolved = false;
+        const fallbackMs = Math.max(
+          900,
+          Math.min(7000, message.length * (70 / Math.max(0.6, speechRate)))
+        );
+        const finalize = () => {
+          if (resolved) {
+            return;
+          }
+          resolved = true;
+          setBossSpeaking(false);
+          resolve();
+        };
+        const fallbackId = window.setTimeout(finalize, fallbackMs);
+        setBossSpeaking(true);
+        speakMessage(message, {
+          onEnd: () => {
+            window.clearTimeout(fallbackId);
+            finalize();
+          },
+        });
+      });
+    const next = bossSpeechQueueRef.current.then(run).catch(() => {});
+    bossSpeechQueueRef.current = next;
+    return next;
   };
 
   useEffect(() => {
@@ -585,7 +1447,15 @@ export default function Home() {
 
   useEffect(() => {
     const attemptStart = async () => {
-      const started = await startAmbient();
+      // Try autoplay; fall back to user toggle if blocked.
+      const params = new URLSearchParams(window.location.search);
+      const quizParam = params.get("quiz");
+      const safeParam = params.get("safe");
+      const shouldUseSafeAudio =
+        !!quizParam || (safeParam && ["1", "true"].includes(safeParam.toLowerCase()));
+      const started = shouldUseSafeAudio
+        ? await startSafeModeAudio()
+        : await startAmbient();
       setSoundBlocked(!started);
       setSoundEnabled(started);
     };
@@ -594,6 +1464,9 @@ export default function Home() {
     return () => {
       stopAmbient();
       stopSpeech();
+      stopBossModeAudio();
+      stopVictoryAudio();
+      stopSafeModeAudio();
       if (crashTimeoutRef.current) {
         window.clearTimeout(crashTimeoutRef.current);
       }
@@ -669,6 +1542,24 @@ export default function Home() {
       if (gameOverTimeoutRef.current) {
         window.clearTimeout(gameOverTimeoutRef.current);
       }
+      if (bossIntroTimeoutRef.current) {
+        window.clearTimeout(bossIntroTimeoutRef.current);
+      }
+      if (bossBattleTimeoutRef.current) {
+        window.clearTimeout(bossBattleTimeoutRef.current);
+      }
+      if (bossShootIntervalRef.current) {
+        window.clearInterval(bossShootIntervalRef.current);
+      }
+      if (bossTickRef.current) {
+        window.clearInterval(bossTickRef.current);
+      }
+      if (bossHitTimeoutRef.current) {
+        window.clearTimeout(bossHitTimeoutRef.current);
+      }
+      if (bossHitTextTimeoutRef.current) {
+        window.clearTimeout(bossHitTextTimeoutRef.current);
+      }
       stopCrashTone();
       const { ctx } = audioRef.current;
       if (ctx) {
@@ -681,8 +1572,55 @@ export default function Home() {
         masterGain: null,
         ambientGain: null,
         sfxGain: null,
+        safeGain: null,
+        safeIntervalId: null,
+        bossGain: null,
+        bossIntervalId: null,
+        victoryGain: null,
+        victoryIntervalId: null,
       };
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    // Query params act as shortcuts for testing safe mode/quiz states.
+    const params = new URLSearchParams(window.location.search);
+    const quizParam = params.get("quiz");
+    const safeParam = params.get("safe");
+
+    if (quizParam) {
+      const normalized = quizParam.toLowerCase();
+      if (normalized === "pass" || normalized === "fail") {
+        setSafeModeShortcut(normalized);
+      } else if (normalized === "1" || normalized === "true") {
+        setSafeModeShortcut("quiz");
+      }
+      setSafeStage("safe");
+      return;
+    }
+
+    if (safeParam) {
+      const normalized = safeParam.toLowerCase();
+      if (normalized === "1" || normalized === "true") {
+        setSafeStage("terminal");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleMove = (event) => {
+      mousePosRef.current = { x: event.clientX, y: event.clientY };
+    };
+    window.addEventListener("mousemove", handleMove);
+    return () => window.removeEventListener("mousemove", handleMove);
   }, []);
 
   useEffect(() => {
@@ -724,6 +1662,7 @@ export default function Home() {
     if (!soundEnabled) {
       return;
     }
+    // Speak analysis only when the user has enabled sound.
     speakMessage(analysisMessage);
   }, [analysisStatus, analysisMessage, soundEnabled]);
 
@@ -808,6 +1747,7 @@ export default function Home() {
       return undefined;
     }
 
+    // Only transition to the crash overlay after the angry line finishes speaking.
     if (!showConfusion || !confusionSpeechDone) {
       return undefined;
     }
@@ -861,6 +1801,7 @@ export default function Home() {
       return undefined;
     }
 
+    // Terminal boot lines are appended sequentially for the reboot vibe.
     const bootLines = [
       "[BOOT] BirthdayBot5000 recovery initialized",
       "[CHECK] Memory banks: OK",
@@ -921,7 +1862,7 @@ export default function Home() {
         window.clearTimeout(safeModeTimeoutRef.current);
       }
     };
-  }, [safeStage]);
+  }, [safeStage, safeModeShortcut]);
 
   useEffect(() => {
     if (safeStage !== "safe") {
@@ -943,6 +1884,7 @@ export default function Home() {
       setQuizCorrect(0);
       setQuizComment("");
       setQuizLocked(false);
+      setSelectedOption("");
       setQuizCommentText("");
       setQuizTyping(false);
       setLieMessageText("");
@@ -950,6 +1892,10 @@ export default function Home() {
       setPassMessageOneText("");
       setPassMessageTwoText("");
       setPassTyping(false);
+      setSafeBotSpeaking(false);
+      setSafeBotAngry(false);
+      setSafeBotFalling(false);
+      safeSpeechQueueRef.current = Promise.resolve();
       victoryPlayedRef.current = false;
       setShowGameOver(false);
       return undefined;
@@ -984,6 +1930,7 @@ export default function Home() {
     setQuizCorrect(0);
     setQuizComment("");
     setQuizLocked(false);
+    setSelectedOption("");
     setQuizCommentText("");
     setQuizTyping(false);
     setLieMessageText("");
@@ -1043,66 +1990,119 @@ export default function Home() {
       window.clearTimeout(gameOverTimeoutRef.current);
     }
 
+    if (safeModeShortcut) {
+      if (safeModeShortcut === "quiz") {
+        setSafeQuizVisible(true);
+        setSafeQuizReady(true);
+        setSafeQuizCleared(false);
+        setQuizStarted(false);
+      } else {
+        const questions = buildQuizQuestions();
+        const scoredTotal = questions.filter((question) => question.scored).length;
+        setSafeQuizVisible(true);
+        setSafeQuizReady(true);
+        setSafeQuizCleared(true);
+        setQuizStarted(true);
+        setQuizQuestions(questions);
+        setQuizIndex(Math.max(0, questions.length - 1));
+        setQuizComplete(true);
+        setQuizCorrect(safeModeShortcut === "pass" ? scoredTotal : 0);
+      }
+      return undefined;
+    }
+
     safeMessageDelayRef.current = window.setTimeout(() => {
+      const scheduleAfterSpeech = (speechPromise, delay, nextStep) => {
+        const run = () => {
+          safeMessageDelayRef.current = window.setTimeout(nextStep, delay);
+        };
+        (speechPromise || Promise.resolve()).then(run);
+      };
+
       let index = 0;
+      let messageOneSpeech = null;
       setSafeTyping(true);
       const typeOne = () => {
+        if (index === 0 && !messageOneSpeech) {
+          messageOneSpeech = queueSafeSpeech(messageOne);
+        }
         index += 1;
         setSafeMessageOne(messageOne.slice(0, index));
         if (index < messageOne.length) {
           safeMessageOneRef.current = window.setTimeout(typeOne, 24);
         } else {
           setSafeTyping(false);
-          safeMessageDelayRef.current = window.setTimeout(() => {
+          scheduleAfterSpeech(messageOneSpeech, 150, () => {
             let indexTwo = 0;
+            let messageTwoSpeech = null;
             setSafeTyping(true);
             const typeTwo = () => {
+              if (indexTwo === 0 && !messageTwoSpeech) {
+                messageTwoSpeech = queueSafeSpeech(messageTwo);
+              }
               indexTwo += 1;
               setSafeMessageTwo(messageTwo.slice(0, indexTwo));
-                if (indexTwo < messageTwo.length) {
-                  safeMessageTwoRef.current = window.setTimeout(typeTwo, 24);
-                } else {
-                  setSafeTyping(false);
-                  safeMessageDelayRef.current = window.setTimeout(() => {
-                    let indexThree = 0;
-                    setSafeTyping(true);
-                    const typeThree = () => {
-                      indexThree += 1;
-                      setSafeMessageThree(messageThree.slice(0, indexThree));
-                      if (indexThree < messageThree.length) {
-                        safeMessageThreeRef.current = window.setTimeout(typeThree, 24);
-                      } else {
-                        setSafeTyping(false);
-                        safeMessageDelayRef.current = window.setTimeout(() => {
-                          let indexFour = 0;
-                          setSafeTyping(true);
-                          const typeFour = () => {
-                            indexFour += 1;
-                            setSafeMessageFour(messageFour.slice(0, indexFour));
-                            if (indexFour < messageFour.length) {
-                              safeMessageFourRef.current = window.setTimeout(typeFour, 24);
-                            } else {
-                              setSafeTyping(false);
-                              safeMessageDelayRef.current = window.setTimeout(() => {
-                                let indexFive = 0;
-                                setSafeTyping(true);
-                                const typeFive = () => {
-                                  indexFive += 1;
-                                  setSafeMessageFive(messageFive.slice(0, indexFive));
-                                  if (indexFive < messageFive.length) {
-                                    safeMessageFiveRef.current = window.setTimeout(typeFive, 24);
-                                  } else {
-                                    setSafeTyping(false);
-                                    safeMessageDelayRef.current = window.setTimeout(() => {
-                                      let indexSix = 0;
-                                      setSafeTyping(true);
-                                      const typeSix = () => {
-                                        indexSix += 1;
-                                        setSafeMessageSix(messageSix.slice(0, indexSix));
-                                        if (indexSix < messageSix.length) {
-                                          safeMessageSixRef.current = window.setTimeout(typeSix, 24);
-                                        } else {
-                                          setSafeTyping(false);
+              if (indexTwo < messageTwo.length) {
+                safeMessageTwoRef.current = window.setTimeout(typeTwo, 24);
+              } else {
+                setSafeTyping(false);
+                scheduleAfterSpeech(messageTwoSpeech, 150, () => {
+                  let indexThree = 0;
+                  let messageThreeSpeech = null;
+                  setSafeTyping(true);
+                  const typeThree = () => {
+                    if (indexThree === 0 && !messageThreeSpeech) {
+                      messageThreeSpeech = queueSafeSpeech(messageThree);
+                    }
+                    indexThree += 1;
+                    setSafeMessageThree(messageThree.slice(0, indexThree));
+                    if (indexThree < messageThree.length) {
+                      safeMessageThreeRef.current = window.setTimeout(typeThree, 24);
+                    } else {
+                      setSafeTyping(false);
+                      scheduleAfterSpeech(messageThreeSpeech, 150, () => {
+                        let indexFour = 0;
+                        let messageFourSpeech = null;
+                        setSafeTyping(true);
+                        const typeFour = () => {
+                          if (indexFour === 0 && !messageFourSpeech) {
+                            messageFourSpeech = queueSafeSpeech(messageFour);
+                          }
+                          indexFour += 1;
+                          setSafeMessageFour(messageFour.slice(0, indexFour));
+                          if (indexFour < messageFour.length) {
+                            safeMessageFourRef.current = window.setTimeout(typeFour, 24);
+                          } else {
+                            setSafeTyping(false);
+                            scheduleAfterSpeech(messageFourSpeech, 150, () => {
+                              let indexFive = 0;
+                              let messageFiveSpeech = null;
+                              setSafeTyping(true);
+                              const typeFive = () => {
+                                if (indexFive === 0 && !messageFiveSpeech) {
+                                  messageFiveSpeech = queueSafeSpeech(messageFive, { angry: true });
+                                }
+                                indexFive += 1;
+                                setSafeMessageFive(messageFive.slice(0, indexFive));
+                                if (indexFive < messageFive.length) {
+                                  safeMessageFiveRef.current = window.setTimeout(typeFive, 24);
+                                } else {
+                                  setSafeTyping(false);
+                                  scheduleAfterSpeech(messageFiveSpeech, 150, () => {
+                                    let indexSix = 0;
+                                    let messageSixSpeech = null;
+                                    setSafeTyping(true);
+                                    const typeSix = () => {
+                                      if (indexSix === 0 && !messageSixSpeech) {
+                                        messageSixSpeech = queueSafeSpeech(messageSix);
+                                      }
+                                      indexSix += 1;
+                                      setSafeMessageSix(messageSix.slice(0, indexSix));
+                                      if (indexSix < messageSix.length) {
+                                        safeMessageSixRef.current = window.setTimeout(typeSix, 24);
+                                      } else {
+                                        setSafeTyping(false);
+                                        (messageSixSpeech || Promise.resolve()).then(() => {
                                           safeQuizTimeoutRef.current = window.setTimeout(() => {
                                             setSafeMessageOne("");
                                             setSafeMessageTwo("");
@@ -1115,8 +2115,12 @@ export default function Home() {
                                             setSafeQuizCleared(false);
                                             safeMessageDelayRef.current = window.setTimeout(() => {
                                               let indexSeven = 0;
+                                              let messageSevenSpeech = null;
                                               setSafeTyping(true);
                                               const typeSeven = () => {
+                                                if (indexSeven === 0 && !messageSevenSpeech) {
+                                                  messageSevenSpeech = queueSafeSpeech(messageSeven, { angry: true });
+                                                }
                                                 indexSeven += 1;
                                                 setSafeMessageSeven(messageSeven.slice(0, indexSeven));
                                                 if (indexSeven < messageSeven.length) {
@@ -1129,26 +2133,27 @@ export default function Home() {
                                               safeMessageSevenRef.current = window.setTimeout(typeSeven, 160);
                                             }, 1000);
                                           }, 3000);
-                                        }
-                                      };
-                                      safeMessageSixRef.current = window.setTimeout(typeSix, 160);
-                                    }, 3000);
-                                  }
-                                };
-                                safeMessageFiveRef.current = window.setTimeout(typeFive, 160);
-                              }, 1500);
-                            }
-                          };
-                          safeMessageFourRef.current = window.setTimeout(typeFour, 160);
-                        }, 1500);
-                      }
-                    };
-                    safeMessageThreeRef.current = window.setTimeout(typeThree, 160);
-                  }, 2000);
-                }
-              };
-              safeMessageTwoRef.current = window.setTimeout(typeTwo, 160);
-            }, 1500);
+                                        });
+                                      }
+                                    };
+                                    safeMessageSixRef.current = window.setTimeout(typeSix, 160);
+                                  });
+                                }
+                              };
+                              safeMessageFiveRef.current = window.setTimeout(typeFive, 160);
+                            });
+                          }
+                        };
+                        safeMessageFourRef.current = window.setTimeout(typeFour, 160);
+                      });
+                    }
+                  };
+                  safeMessageThreeRef.current = window.setTimeout(typeThree, 160);
+                });
+              }
+            };
+            safeMessageTwoRef.current = window.setTimeout(typeTwo, 160);
+          });
         }
       };
 
@@ -1222,6 +2227,7 @@ export default function Home() {
     setQuizIndex(0);
     setQuizCorrect(0);
     setQuizComment("");
+    setSelectedOption("");
     setPassMessageOneText("");
     setPassMessageTwoText("");
     setPassTyping(false);
@@ -1234,6 +2240,7 @@ export default function Home() {
     setQuizCommentText("");
     setQuizTyping(false);
     setQuizLocked(false);
+    setSelectedOption("");
     setQuizIndex((value) => {
       const nextIndex = value + 1;
       if (nextIndex >= quizQuestions.length) {
@@ -1268,6 +2275,7 @@ export default function Home() {
       commentOptions[Math.floor(Math.random() * commentOptions.length)];
 
     setQuizLocked(true);
+    setSelectedOption(option.label);
     setQuizComment(comment);
     setQuizCommentText("");
     setQuizTyping(true);
@@ -1288,17 +2296,23 @@ export default function Home() {
     }
 
     let index = 0;
+    let commentSpeech = null;
     setQuizCommentText("");
     setQuizTyping(true);
 
     const typeNext = () => {
+      if (index === 0 && !commentSpeech) {
+        commentSpeech = queueSafeSpeech(quizComment);
+      }
       index += 1;
       setQuizCommentText(quizComment.slice(0, index));
       if (index < quizComment.length) {
         quizCommentTypeRef.current = window.setTimeout(typeNext, 24);
       } else {
         setQuizTyping(false);
-        quizAdvanceTimeoutRef.current = window.setTimeout(advanceQuiz, 1000);
+        (commentSpeech || Promise.resolve()).then(() => {
+          quizAdvanceTimeoutRef.current = window.setTimeout(advanceQuiz, 1000);
+        });
       }
     };
 
@@ -1327,6 +2341,7 @@ export default function Home() {
       setPassTyping(false);
       victoryPlayedRef.current = false;
       setShowGameOver(false);
+      setSelectedOption("");
       return undefined;
     }
 
@@ -1345,22 +2360,28 @@ export default function Home() {
     }
 
     let index = 0;
+    let lieSpeech = null;
     setLieMessageText("");
     setLieTyping(true);
     setShowGameOver(false);
 
     const typeNext = () => {
+      if (index === 0 && !lieSpeech) {
+        lieSpeech = queueSafeSpeech(lieMessage, { angry: true });
+      }
       index += 1;
       setLieMessageText(lieMessage.slice(0, index));
       if (index < lieMessage.length) {
         lieMessageTypeRef.current = window.setTimeout(typeNext, 24);
       } else {
         setLieTyping(false);
+        (lieSpeech || Promise.resolve()).then(() => {
           gameOverTimeoutRef.current = window.setTimeout(() => {
             setShowGameOver(true);
           }, 3500);
-        }
-      };
+        });
+      }
+    };
 
     lieMessageTypeRef.current = window.setTimeout(typeNext, 160);
 
@@ -1380,6 +2401,7 @@ export default function Home() {
       setPassMessageTwoText("");
       setPassTyping(false);
       victoryPlayedRef.current = false;
+      setBossSpeechDone(false);
       return undefined;
     }
 
@@ -1403,31 +2425,44 @@ export default function Home() {
     }
 
     let indexOne = 0;
+    let messageOneSpeech = null;
     setPassMessageOneText("");
     setPassMessageTwoText("");
     setPassTyping(true);
 
     const typeFirst = () => {
+      if (indexOne === 0 && !messageOneSpeech) {
+        messageOneSpeech = queueSafeSpeech(messageOne, { angry: true });
+      }
       indexOne += 1;
       setPassMessageOneText(messageOne.slice(0, indexOne));
       if (indexOne < messageOne.length) {
         passMessageOneTypeRef.current = window.setTimeout(typeFirst, 24);
       } else {
         setPassTyping(false);
-        passMessageDelayRef.current = window.setTimeout(() => {
-          let indexTwo = 0;
-          setPassTyping(true);
-          const typeSecond = () => {
-            indexTwo += 1;
-            setPassMessageTwoText(messageTwo.slice(0, indexTwo));
-            if (indexTwo < messageTwo.length) {
-              passMessageTwoTypeRef.current = window.setTimeout(typeSecond, 24);
-            } else {
-              setPassTyping(false);
-            }
-          };
-          passMessageTwoTypeRef.current = window.setTimeout(typeSecond, 160);
-        }, 1000);
+        (messageOneSpeech || Promise.resolve()).then(() => {
+          passMessageDelayRef.current = window.setTimeout(() => {
+            let indexTwo = 0;
+            let messageTwoSpeech = null;
+            setPassTyping(true);
+            const typeSecond = () => {
+              if (indexTwo === 0 && !messageTwoSpeech) {
+                messageTwoSpeech = queueSafeSpeech(messageTwo, { angry: true });
+              }
+              indexTwo += 1;
+              setPassMessageTwoText(messageTwo.slice(0, indexTwo));
+              if (indexTwo < messageTwo.length) {
+                passMessageTwoTypeRef.current = window.setTimeout(typeSecond, 24);
+              } else {
+                setPassTyping(false);
+                (messageTwoSpeech || Promise.resolve()).then(() => {
+                  setBossSpeechDone(true);
+                });
+              }
+            };
+            passMessageTwoTypeRef.current = window.setTimeout(typeSecond, 160);
+          }, 1000);
+        });
       }
     };
 
@@ -1446,7 +2481,251 @@ export default function Home() {
     };
   }, [quizComplete, passesQuiz, soundEnabled]);
 
-  const typingActive = safeTyping || quizTyping || lieTyping || passTyping;
+  useEffect(() => {
+    if (quizComplete && passesQuiz) {
+      return undefined;
+    }
+
+    setBossPhase("off");
+    setBossHealth(3);
+    setBossProjectiles([]);
+    setBossHitFlash(false);
+    setBossHitText("");
+    setBossSpeaking(false);
+    setBossFire(false);
+    setBossExplode(false);
+    setBossEyesDead(false);
+    setBossDeathLine("");
+    setBossFinalLine("");
+    setSafeBotFalling(false);
+    bossSpeechQueueRef.current = Promise.resolve();
+    return undefined;
+  }, [quizComplete, passesQuiz]);
+
+  useEffect(() => {
+    if (!quizComplete || !passesQuiz || !bossSpeechDone || bossPhase !== "off") {
+      return undefined;
+    }
+
+    // Transition from quiz pass into the boss intro drop.
+    setBossPhase("drop");
+    setSafeBotFalling(true);
+    stopSafeModeAudio();
+    stopVictoryAudio();
+    stopBossModeAudio();
+    if (soundEnabled) {
+      playBossCrashSound();
+    }
+    return undefined;
+  }, [quizComplete, passesQuiz, bossSpeechDone, bossPhase, soundEnabled]);
+
+  useEffect(() => {
+    if (bossPhase !== "drop") {
+      return undefined;
+    }
+
+    if (bossIntroTimeoutRef.current) {
+      window.clearTimeout(bossIntroTimeoutRef.current);
+    }
+
+    bossIntroTimeoutRef.current = window.setTimeout(() => {
+      setBossPhase("intro");
+    }, 900);
+
+    return () => {
+      if (bossIntroTimeoutRef.current) {
+        window.clearTimeout(bossIntroTimeoutRef.current);
+      }
+    };
+  }, [bossPhase]);
+
+  useEffect(() => {
+    if (bossPhase !== "intro") {
+      return undefined;
+    }
+
+    setBossHealth(3);
+    setBossProjectiles([]);
+    setBossHitText("");
+    setBossHitFlash(false);
+    setBossFire(false);
+    setBossExplode(false);
+    setBossEyesDead(false);
+    setBossDeathLine("");
+    setBossFinalLine("");
+    bossSpeechQueueRef.current = Promise.resolve();
+
+    if (soundEnabled) {
+      startBossModeAudio();
+    }
+
+    if (bossBattleTimeoutRef.current) {
+      window.clearTimeout(bossBattleTimeoutRef.current);
+    }
+
+    bossBattleTimeoutRef.current = window.setTimeout(() => {
+      setBossPhase("battle");
+    }, 1200);
+
+    return () => {
+      if (bossBattleTimeoutRef.current) {
+        window.clearTimeout(bossBattleTimeoutRef.current);
+      }
+    };
+  }, [bossPhase, soundEnabled]);
+
+  useEffect(() => {
+    if (bossPhase !== "battle") {
+      if (bossShootIntervalRef.current) {
+        window.clearInterval(bossShootIntervalRef.current);
+      }
+      if (bossTickRef.current) {
+        window.clearInterval(bossTickRef.current);
+      }
+      return undefined;
+    }
+
+    const spawnProjectile = () => {
+      if (typeof window === "undefined") {
+        return;
+      }
+      const id = bossProjectileIdRef.current + 1;
+      bossProjectileIdRef.current = id;
+      const startX = window.innerWidth * 0.5;
+      const startY = window.innerHeight * 0.22;
+      setBossProjectiles((prev) => [
+        ...prev,
+        { id, x: startX, y: startY },
+      ]);
+    };
+
+    const tickProjectiles = () => {
+      if (typeof window === "undefined") {
+        return;
+      }
+      // Projectiles track the latest mouse position to allow dodging.
+      const { x: targetX, y: targetY } = mousePosRef.current;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      setBossProjectiles((prev) =>
+        prev
+          .map((projectile) => {
+            const dx = targetX - projectile.x;
+            const dy = targetY - projectile.y;
+            const distance = Math.max(1, Math.hypot(dx, dy));
+            const speed = 3.6;
+            if (distance <= speed) {
+              return { ...projectile, x: targetX, y: targetY };
+            }
+            return {
+              ...projectile,
+              x: projectile.x + (dx / distance) * speed,
+              y: projectile.y + (dy / distance) * speed,
+            };
+          })
+          .filter(
+            (projectile) =>
+              projectile.x > -80 &&
+              projectile.x < width + 80 &&
+              projectile.y > -80 &&
+              projectile.y < height + 80
+          )
+      );
+    };
+
+    spawnProjectile();
+    bossShootIntervalRef.current = window.setInterval(spawnProjectile, 780);
+    bossTickRef.current = window.setInterval(tickProjectiles, 30);
+
+    return () => {
+      if (bossShootIntervalRef.current) {
+        window.clearInterval(bossShootIntervalRef.current);
+      }
+      if (bossTickRef.current) {
+        window.clearInterval(bossTickRef.current);
+      }
+    };
+  }, [bossPhase, soundEnabled]);
+
+  useEffect(() => {
+    if (bossPhase !== "defeated") {
+      return undefined;
+    }
+
+    setBossProjectiles([]);
+    setBossFire(true);
+    setBossExplode(true);
+    setBossEyesDead(true);
+    stopBossModeAudio();
+    if (soundEnabled) {
+      playBossExplosionSound();
+      startVictoryAudio();
+    }
+
+    bossSpeechQueueRef.current = Promise.resolve();
+    const deathIntro = "arrrghghghghh";
+    const deathScream = "noooooooooooooooo";
+    const deathLine =
+      "nooo! I.... Then i'm forced to admit... it is your birthday... but this isn't the last you've seen of me";
+    const finalLine = "HAPPY\u00A0BIRTHDAY\u00A0DAD!!!\nFROM NOAH & SIMON";
+    setBossDeathLine(deathIntro);
+    setBossFinalLine("");
+
+    queueBossSpeech(deathIntro)
+      .then(() => {
+        setBossDeathLine(deathScream);
+        return queueBossSpeech(deathScream);
+      })
+      .then(() => {
+        setBossDeathLine(deathLine);
+        return queueBossSpeech(deathLine);
+      })
+      .then(() => {
+        setBossFinalLine(finalLine);
+        return queueBossSpeech(finalLine);
+      });
+
+    return undefined;
+  }, [bossPhase, soundEnabled]);
+
+  useEffect(() => {
+    if (bossPhase !== "off") {
+      return undefined;
+    }
+    stopBossModeAudio();
+    stopVictoryAudio();
+    setBossProjectiles([]);
+    setBossHitText("");
+    setBossHitFlash(false);
+    setBossFire(false);
+    setBossExplode(false);
+    setBossEyesDead(false);
+    setBossDeathLine("");
+    setBossFinalLine("");
+    if (bossHitTextTimeoutRef.current) {
+      window.clearTimeout(bossHitTextTimeoutRef.current);
+    }
+    return undefined;
+  }, [bossPhase]);
+
+  useEffect(() => {
+    if (!soundEnabled) {
+      stopBossModeAudio();
+      stopVictoryAudio();
+      return;
+    }
+    if (bossPhase === "intro" || bossPhase === "battle") {
+      startBossModeAudio();
+      return;
+    }
+    if (bossPhase === "defeated") {
+      startVictoryAudio();
+    }
+  }, [bossPhase, soundEnabled]);
+
+  // Aggregate typing state to drive shared SFX and bot animation.
+  const typingNoiseActive = safeTyping || quizTyping || lieTyping || passTyping;
+  const typingActive = typingNoiseActive || safeBotSpeaking;
 
   const renderWaveText = (text) =>
     text.split("").map((letter, index) => (
@@ -1463,7 +2742,7 @@ export default function Home() {
     ));
 
   useEffect(() => {
-    if (!typingActive || !soundEnabled) {
+    if (!typingNoiseActive || !soundEnabled) {
       if (safeTypingNoiseRef.current) {
         window.clearInterval(safeTypingNoiseRef.current);
       }
@@ -1505,7 +2784,7 @@ export default function Home() {
         window.clearInterval(safeTypingNoiseRef.current);
       }
     };
-  }, [typingActive, soundEnabled]);
+  }, [typingNoiseActive, soundEnabled]);
 
   useEffect(() => {
     if (!showOutburst) {
@@ -1515,6 +2794,7 @@ export default function Home() {
       setShowConfusion(false);
       setConfusionText("");
       setConfusionSpeechDone(false);
+      setSafeBotAngry(false);
       return undefined;
     }
 
@@ -1555,7 +2835,7 @@ export default function Home() {
         window.clearTimeout(outburstTimeoutRef.current);
       }
     };
-  }, [showOutburst]);
+  }, [showOutburst, soundEnabled]);
 
   useEffect(() => {
     if (!showOutburst || !outburstDone || !outburstSpeechDone) {
@@ -1695,6 +2975,19 @@ export default function Home() {
     }
   }, [safeStage]);
 
+  useEffect(() => {
+    if (safeStage === "terminal" || safeStage === "safe") {
+      stopAmbient();
+      if (soundEnabled && bossPhase === "off") {
+        startSafeModeAudio();
+      } else {
+        stopSafeModeAudio();
+      }
+      return;
+    }
+    stopSafeModeAudio();
+  }, [safeStage, soundEnabled, bossPhase]);
+
   const toggleDayDropdown = () => {
     const select = daySelectRef.current;
     if (!select) {
@@ -1716,23 +3009,78 @@ export default function Home() {
       return;
     }
 
+    // Lock the button to avoid double-triggering the crash sequence.
     setMissingButtonDisabled(true);
     setBotAngry(true);
     setShowOutburst(true);
     setCrashStage("glitch");
   };
 
+  const handleBossHit = () => {
+    if (bossPhase !== "battle") {
+      return;
+    }
+    if (bossHitTimeoutRef.current) {
+      window.clearTimeout(bossHitTimeoutRef.current);
+    }
+    setBossHitFlash(true);
+    bossHitTimeoutRef.current = window.setTimeout(() => {
+      setBossHitFlash(false);
+    }, 160);
+
+    if (soundEnabled) {
+      playBossHitSound();
+    }
+
+    const hitLines = ["Oof!", "Ouch!", "Ow!", "Hey!"];
+    const hitLine = hitLines[Math.floor(Math.random() * hitLines.length)];
+    setBossHitText(hitLine);
+    if (bossHitTextTimeoutRef.current) {
+      window.clearTimeout(bossHitTextTimeoutRef.current);
+    }
+    bossHitTextTimeoutRef.current = window.setTimeout(() => {
+      setBossHitText("");
+    }, 900);
+    if (soundEnabled && !bossSpeaking) {
+      queueBossSpeech(hitLine);
+    }
+
+    setBossHealth((value) => {
+      const next = Math.max(0, value - 1);
+      if (next === 0) {
+        setBossPhase("defeated");
+      }
+      return next;
+    });
+  };
+
   const handleToggleSound = async () => {
     if (soundEnabled) {
       stopSpeech();
       stopAmbient();
+      stopSafeModeAudio();
+      stopBossModeAudio();
+      stopVictoryAudio();
       stopCrashTone();
+      safeSpeechQueueRef.current = Promise.resolve();
+      bossSpeechQueueRef.current = Promise.resolve();
+      setSafeBotSpeaking(false);
+      setSafeBotAngry(false);
+      setBossSpeaking(false);
       setSoundEnabled(false);
       setSoundBlocked(false);
       return;
     }
 
-    const started = await startAmbient();
+    // Choose the correct audio bed based on the current story phase.
+    const started =
+      safeStage === "terminal" || safeStage === "safe"
+        ? bossPhase === "defeated"
+          ? await startVictoryAudio()
+          : bossPhase === "off"
+            ? await startSafeModeAudio()
+            : await startBossModeAudio()
+        : await startAmbient();
     if (started) {
       setSoundBlocked(false);
       setSoundEnabled(true);
@@ -1742,6 +3090,7 @@ export default function Home() {
     setSoundBlocked(true);
   };
 
+  // Prefer crypto for less predictable per-click variants.
   const createVariantSeed = () => {
     if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
       const values = new Uint32Array(1);
@@ -1763,6 +3112,7 @@ export default function Home() {
 
     try {
       const variantSeed = createVariantSeed();
+      // Server route handles prompt assembly and OpenAI call.
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1789,10 +3139,12 @@ export default function Home() {
     }
   };
 
+  const inSafeMode = safeStage === "terminal" || safeStage === "safe";
+
   return (
     <main className={styles.main}>
       <button
-        className={styles.soundToggle}
+        className={`${styles.soundToggle} ${inSafeMode ? styles.soundToggleSafe : ""}`}
         type="button"
         onClick={handleToggleSound}
       >
@@ -2045,6 +3397,8 @@ export default function Home() {
               <div
                 className={`${styles.safeModeAvatar} ${
                   typingActive ? styles.safeBotSpeaking : ""
+                } ${safeBotAngry ? styles.safeBotAngry : ""} ${
+                  safeBotFalling ? styles.safeBotFalling : ""
                 }`}
                 aria-hidden="true"
               >
@@ -2064,6 +3418,10 @@ export default function Home() {
                 </div>
               </div>
               <div className={styles.safeBotFace}>
+                <div className={styles.safeBotBrows}>
+                  <span className={styles.safeBotBrow} />
+                  <span className={styles.safeBotBrow} />
+                </div>
                 <div className={styles.safeBotEye} />
                 <div className={styles.safeBotEye} />
               </div>
@@ -2073,7 +3431,7 @@ export default function Home() {
               {safeQuizVisible ? (
                 <div className={styles.safeQuizWindow} role="dialog" aria-label="Birthday Quiz">
                   <div className={styles.safeQuizTitleBar}>
-                    <span>Birthday Quiz v1.0 - Title</span>
+                    <span>Birthday Quiz v1.0</span>
                     <button
                       className={styles.safeQuizClose}
                       type="button"
@@ -2117,7 +3475,11 @@ export default function Home() {
                             {currentQuestion.options.map((option) => (
                               <button
                                 key={option.label}
-                                className={styles.safeQuizOptionButton}
+                                className={`${styles.safeQuizOptionButton} ${
+                                  selectedOption === option.label
+                                    ? styles.safeQuizOptionSelected
+                                    : ""
+                                }`}
                                 type="button"
                                 disabled={quizLocked}
                                 onClick={() => handleAnswer(currentQuestion, option)}
@@ -2217,6 +3579,84 @@ export default function Home() {
                   <div className={styles.safeModeSpacer} aria-hidden="true" />
                 ) : null}
               </div>
+            </div>
+          </div>
+        ) : null}
+        {bossPhase !== "off" && bossPhase !== "drop" ? (
+          <div className={styles.bossOverlay} role="presentation">
+            <div className={styles.bossHud}>
+              <span className={styles.bossHudTitle}>MECHA BIRTHDAYBOT</span>
+              <div className={styles.bossHealthBar}>
+                <div
+                  className={styles.bossHealthFill}
+                  style={{ width: `${(bossHealth / 3) * 100}%` }}
+                />
+              </div>
+            </div>
+            <div className={styles.bossArena}>
+              <div
+                className={`${styles.bossBot} ${
+                  bossPhase === "intro" ? styles.bossBotRise : ""
+                } ${bossHitFlash ? styles.bossHitFlash : ""} ${
+                  bossFire ? styles.bossBotFire : ""
+                } ${bossExplode ? styles.bossBotExplode : ""} ${
+                  bossEyesDead ? styles.bossBotDead : ""
+                } ${bossSpeaking ? styles.bossBotSpeaking : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={handleBossHit}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    handleBossHit();
+                  }
+                }}
+              >
+                <div className={styles.bossBotAntenna} />
+                <div className={styles.bossBotCakeTop} />
+                <div className={styles.bossBotFrosting} />
+                <div className={styles.bossBotCakeBase}>
+                  <span className={styles.bossBotPlate} />
+                  <span className={styles.bossBotPlate} />
+                </div>
+                <div className={styles.bossBotCandles}>
+                  <div className={styles.bossBotCandle}>
+                    <span className={styles.bossBotFlame} />
+                  </div>
+                  <div className={styles.bossBotCandle}>
+                    <span className={styles.bossBotFlame} />
+                  </div>
+                  <div className={styles.bossBotCandle}>
+                    <span className={styles.bossBotFlame} />
+                  </div>
+                </div>
+                <div className={styles.bossBotFace}>
+                  <div className={styles.bossBotBrows}>
+                    <span className={styles.bossBotBrow} />
+                    <span className={styles.bossBotBrow} />
+                  </div>
+                  <div className={styles.bossBotEyes}>
+                    <div className={styles.bossBotEye} />
+                    <div className={styles.bossBotEye} />
+                  </div>
+                </div>
+                <div className={styles.bossBotMouth} />
+              </div>
+              {bossProjectiles.map((projectile) => (
+                <div
+                  key={projectile.id}
+                  className={styles.bossProjectile}
+                  style={{ transform: `translate(${projectile.x}px, ${projectile.y}px)` }}
+                />
+              ))}
+              {bossHitText ? (
+                <div className={styles.bossHitText}>{bossHitText}</div>
+              ) : null}
+              {bossDeathLine ? (
+                <div className={styles.bossDeathText}>{bossDeathLine}</div>
+              ) : null}
+              {bossFinalLine ? (
+                <div className={styles.bossFinalText}>{bossFinalLine}</div>
+              ) : null}
             </div>
           </div>
         ) : null}

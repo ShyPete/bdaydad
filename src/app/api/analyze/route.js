@@ -18,11 +18,14 @@ const MONTHS = [
 ];
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// Keep prompts in a single JSON file for easy tuning without code changes.
 const PROMPT_PATH = path.join(process.cwd(), "prompts", "prompts.json");
 
+// In-memory cache per server instance to avoid re-reading on each request.
 let cachedPrompts = null;
 
 const normalizePrompt = (prompt) => {
+  // Prompts can be arrays for multi-line editing; normalize to a single string.
   if (Array.isArray(prompt)) {
     return prompt.join("\n").trim();
   }
@@ -49,6 +52,7 @@ const normalizeSeasonalVibes = (value) => {
 };
 
 const parseMonthDay = (value) => {
+  // Expected format for holiday windows is MM-DD (zero-padded).
   if (typeof value !== "string") {
     return null;
   }
@@ -132,6 +136,7 @@ const loadPrompts = async () => {
     };
     return cachedPrompts;
   } catch (error) {
+    // Fallback keeps the app functional if prompts.json is missing or invalid.
     cachedPrompts = {
       systemPrompt:
         "You are BirthdayBot5000, a cocky, smug birthday analysis bot. " +
@@ -149,6 +154,7 @@ const loadPrompts = async () => {
 };
 
 const safeDate = (value) => {
+  // Protect against invalid client dates; default to server time.
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return new Date();
@@ -157,6 +163,7 @@ const safeDate = (value) => {
 };
 
 const mulberry32 = (seed) => {
+  // Deterministic RNG so prompt variations are stable per seed.
   let t = seed >>> 0;
   return () => {
     t += 0x6d2b79f5;
@@ -188,6 +195,7 @@ const pickMany = (rng, list, count) => {
 };
 
 const getSeason = (monthIndex) => {
+  // Northern hemisphere seasons only (used as hidden tone cues).
   const month = monthIndex + 1;
   if (month === 12 || month <= 2) {
     return "winter";
@@ -214,6 +222,7 @@ const isWithinWindow = (month, day, window) => {
 };
 
 const getZodiacSign = (monthIndex, dayNumber) => {
+  // Zodiac is used for hidden tone cues only, not explicit output.
   const month = monthIndex + 1;
   const ranges = [
     { sign: "Capricorn", start: [12, 22], end: [1, 19] },
@@ -250,6 +259,7 @@ const getZodiacSign = (monthIndex, dayNumber) => {
 };
 
 const buildAnalysisContext = (month, day, clientDate) => {
+  // Normalize the selected date into relation + days-until for the prompt.
   const monthIndex = MONTHS.indexOf(month);
   const dayNumber = Number(day);
   if (monthIndex < 0 || Number.isNaN(dayNumber)) {
@@ -328,6 +338,7 @@ export async function POST(request) {
     astroTraits,
   } = await loadPrompts();
 
+  // Seed mixes client-provided variant with date for per-click variety.
   const seedBase = Number.isFinite(Number(variantSeed))
     ? Number(variantSeed)
     : Date.now();

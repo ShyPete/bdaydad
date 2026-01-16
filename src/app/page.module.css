@@ -99,7 +99,9 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 0.9rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 0.5rem;
 }
 
@@ -205,11 +207,29 @@
   text-align: left;
   color: #000000;
   cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.safeQuizOptionButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #3b79c5;
+  box-shadow: 0 6px 10px rgba(30, 90, 168, 0.25);
+}
+
+.safeQuizOptionButton:focus-visible {
+  outline: 2px solid #3b79c5;
+  outline-offset: 2px;
 }
 
 .safeQuizOptionButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.safeQuizOptionSelected {
+  border-color: #1e5aa8;
+  background: #e1efff;
+  box-shadow: inset 0 0 0 1px rgba(30, 90, 168, 0.35);
 }
 
 .safeQuizComment {
@@ -259,6 +279,24 @@
   font-weight: 700;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+
+.safeQuizButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 6px 14px rgba(30, 90, 168, 0.3);
+}
+
+.safeQuizButton:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+.safeQuizButton:focus-visible {
+  outline: 2px solid #1e5aa8;
+  outline-offset: 2px;
 }
 
 .safeQuizButton:disabled {
@@ -385,6 +423,30 @@
   gap: 18px;
 }
 
+.safeBotBrows {
+  position: absolute;
+  top: -12px;
+  display: flex;
+  gap: 18px;
+}
+
+.safeBotBrow {
+  width: 18px;
+  height: 4px;
+  background: rgba(124, 255, 122, 0.85);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px #000;
+  transform: rotate(0deg);
+}
+
+.safeBotAngry .safeBotBrow:first-child {
+  transform: rotate(25deg) translateY(2px);
+}
+
+.safeBotAngry .safeBotBrow:last-child {
+  transform: rotate(-25deg) translateY(2px);
+}
+
 .safeBotEye {
   width: 16px;
   height: 16px;
@@ -428,6 +490,10 @@
   box-shadow: 0 0 0 4px #000;
 }
 
+.safeBotFalling {
+  animation: safeBotDrop 0.9s ease-in forwards;
+}
+
 @keyframes safeMouthTalk {
   0%,
   100% {
@@ -435,6 +501,17 @@
   }
   50% {
     transform: scaleY(1.1);
+  }
+}
+
+@keyframes safeBotDrop {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(140vh);
+    opacity: 0;
   }
 }
 
@@ -451,6 +528,10 @@
   font-size: 0.85rem;
   z-index: 6;
   cursor: pointer;
+}
+
+.soundToggleSafe {
+  z-index: 12;
 }
 
 .soundToggle:hover {
@@ -882,6 +963,420 @@
   text-align: right;
   color: rgba(255, 255, 255, 0.7);
   font-variant-numeric: tabular-nums;
+}
+
+/* Boss battle UI layer; keep background translucent so the scene stays visible. */
+.bossOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: rgba(5, 6, 8, 0.15);
+  color: #fef4e0;
+  font-family: "Space Mono", "Courier New", monospace;
+  pointer-events: none;
+}
+
+.bossHud {
+  padding: 1.2rem 1.4rem 0;
+  display: grid;
+  justify-content: start;
+  justify-items: start;
+  align-items: start;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.bossHudTitle {
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.bossHealthBar {
+  width: min(320px, 70vw);
+  height: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.bossHealthFill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff6b6b, #ffb347);
+  transition: width 200ms ease;
+}
+
+.bossArena {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.bossBot {
+  width: min(360px, 70vw);
+  aspect-ratio: 3 / 4;
+  background: transparent;
+  border: none;
+  border-radius: 24px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  cursor: crosshair;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.55);
+  transition: transform 120ms ease;
+  pointer-events: auto;
+}
+
+.bossBotRise {
+  animation: bossRise 0.9s cubic-bezier(0.2, 0.85, 0.2, 1) both;
+}
+
+.bossHitFlash {
+  filter: brightness(1.4);
+}
+
+.bossBotSpeaking .bossBotMouth {
+  animation: bossMouthTalk 0.16s ease-in-out infinite;
+}
+
+.bossBotFire::after {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(circle, rgba(255, 128, 0, 0.6), transparent 60%);
+  mix-blend-mode: screen;
+  animation: bossFlameRise 0.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.bossBotExplode::before {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 220, 150, 0.95) 0%,
+    rgba(255, 140, 60, 0.85) 35%,
+    rgba(255, 70, 0, 0.4) 55%,
+    transparent 70%
+  );
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter: blur(2px);
+  animation: bossExplosionPulse 0.7s ease-out forwards;
+  pointer-events: none;
+}
+
+.bossBotAntenna {
+  position: absolute;
+  top: -18px;
+  width: 12px;
+  height: 36px;
+  background: #ff6b6b;
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px #0c0f18;
+}
+
+.bossBotCakeBase,
+.bossBotCakeTop {
+  position: absolute;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f2b56b, #e58a52);
+  border: 3px solid #0c0f18;
+  box-shadow: inset 0 -6px rgba(0, 0, 0, 0.35);
+}
+
+.bossBotCakeBase {
+  width: 82%;
+  height: 48%;
+  bottom: 12%;
+}
+
+.bossBotCakeTop {
+  width: 60%;
+  height: 26%;
+  bottom: 50%;
+}
+
+.bossBotFrosting {
+  position: absolute;
+  bottom: 56%;
+  width: 64%;
+  height: 16%;
+  border-radius: 999px 999px 10px 10px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 -4px rgba(0, 0, 0, 0.35);
+  border: 2px solid #0c0f18;
+}
+
+.bossBotCandles {
+  position: absolute;
+  top: auto;
+  bottom: calc(50% + 22%);
+  width: 60%;
+  display: flex;
+  justify-content: space-around;
+}
+
+.bossBotCandle {
+  width: 12px;
+  height: 40px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid #0c0f18;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+}
+
+.bossBotFlame {
+  position: absolute;
+  top: -12px;
+  left: calc(50% - 1px);
+  width: 12px;
+  height: 14px;
+  background: rgba(255, 107, 107, 0.85);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  animation: bossFlameRise 0.8s ease-in-out infinite;
+}
+
+.bossBotPlate {
+  position: absolute;
+  width: 28px;
+  height: 10px;
+  border-radius: 6px;
+  background: #2b2f3a;
+  border: 2px solid #0c0f18;
+  top: 18%;
+}
+
+.bossBotPlate:first-child {
+  left: 18%;
+}
+
+.bossBotPlate:last-child {
+  right: 18%;
+}
+
+.bossBotFace {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  position: absolute;
+  bottom: 26%;
+}
+
+.bossBotBrows {
+  display: flex;
+  gap: 24px;
+}
+
+.bossBotBrow {
+  width: 24px;
+  height: 6px;
+  background: #1b1c2a;
+  border-radius: 6px;
+  transform: rotate(24deg);
+}
+
+.bossBotBrow:last-child {
+  transform: rotate(-24deg);
+}
+
+.bossBotEyes {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.bossBotEye {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #10141f;
+  position: relative;
+  overflow: visible;
+  box-shadow:
+    0 0 0 4px rgba(0, 0, 0, 0.35),
+    0 0 12px rgba(255, 80, 80, 0.7);
+}
+
+.bossBotDead .bossBotEye {
+  background: #141827;
+  box-shadow:
+    0 0 0 4px rgba(0, 0, 0, 0.45),
+    0 0 12px rgba(255, 80, 80, 0.4);
+}
+
+.bossBotDead .bossBotEye::before,
+.bossBotDead .bossBotEye::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 26px;
+  height: 4px;
+  background: #ff6b6b;
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(255, 80, 80, 0.6);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.bossBotDead .bossBotEye::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.bossBotMouth {
+  position: absolute;
+  bottom: 18%;
+  width: 60px;
+  height: 20px;
+  border-bottom: 4px solid #1b1c2a;
+  border-radius: 0 0 40px 40px;
+}
+
+.bossProjectile {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff6b6b, #c92b2b);
+  box-shadow: 0 0 10px rgba(255, 92, 92, 0.7);
+  pointer-events: none;
+}
+
+.bossHitText {
+  position: absolute;
+  bottom: 20%;
+  font-size: 1.2rem;
+  color: #ffb347;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+.bossDeathText {
+  position: absolute;
+  bottom: 12%;
+  width: min(680px, 90vw);
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Final shout is free-floating with a rainbow gradient and subtle backing. */
+.bossFinalText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  bottom: auto;
+  max-width: min(1300px, 98vw);
+  display: block;
+  text-align: center;
+  font-size: clamp(2.1rem, 5.6vw, 3.4rem);
+  font-weight: 800;
+  color: #fff7d6;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: pre-line;
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.45),
+    0 0 18px rgba(255, 120, 200, 0.7),
+    0 0 28px rgba(255, 210, 120, 0.8);
+  background: linear-gradient(
+    120deg,
+    #ff7ad9,
+    #ffd166,
+    #9bf6ff,
+    #bdb2ff,
+    #ffadad
+  );
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 0.2rem 0.5rem;
+  border-radius: 18px;
+  animation: bossFinalPulse 1.2s ease-in-out infinite, bossGradientShift 3s ease-in-out infinite;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes bossMouthTalk {
+  0%,
+  100% {
+    transform: scaleY(0.7);
+  }
+  50% {
+    transform: scaleY(1.15);
+  }
+}
+
+@keyframes bossRise {
+  from {
+    transform: translateY(120vh) scale(1.05);
+  }
+  to {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bossExplosionPulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  45% {
+    opacity: 0.95;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes bossFlameRise {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-30px);
+  }
+}
+
+@keyframes bossFinalPulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+
+@keyframes bossGradientShift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 @keyframes float {
