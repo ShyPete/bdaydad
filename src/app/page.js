@@ -60,6 +60,7 @@ export default function Home() {
   const [bossPhase, setBossPhase] = useState("off");
   const [bossHealth, setBossHealth] = useState(6);
   const [bossProjectiles, setBossProjectiles] = useState([]);
+  const [bossExplosions, setBossExplosions] = useState([]);
   const [bossHitFlash, setBossHitFlash] = useState(false);
   const [bossHitText, setBossHitText] = useState("");
   const [bossSpeaking, setBossSpeaking] = useState(false);
@@ -126,6 +127,7 @@ export default function Home() {
   const bossProjectileIdRef = useRef(0);
   const bossFinalTimeoutRef = useRef(null);
   const creditsTimeoutRef = useRef(null);
+  const bossProjectilesRef = useRef([]);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const victoryPlayedRef = useRef(false);
   // Shared Web Audio graph; reused across ambient/safe/boss/victory layers.
@@ -574,6 +576,46 @@ export default function Home() {
       });
     };
 
+    const playChoirPad = (notes, time) => {
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      gain.gain.value = 0.0;
+      filter.type = "lowpass";
+      filter.frequency.value = 900;
+      filter.connect(gain).connect(bossGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.12, time + beat * 0.4);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + beat * 3.6);
+      notes.forEach((note) => {
+        const osc = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        osc.type = "sine";
+        osc2.type = "triangle";
+        osc.frequency.value = midiToFreq(note);
+        osc2.frequency.value = midiToFreq(note + 12);
+        osc.connect(filter);
+        osc2.connect(filter);
+        osc.start(time);
+        osc2.start(time);
+        osc.stop(time + beat * 3.8);
+        osc2.stop(time + beat * 3.8);
+      });
+    };
+
+    const playChime = (frequency, time) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = frequency;
+      gain.gain.value = 0.0;
+      osc.connect(gain).connect(bossGain);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.08, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + beat * 1.2);
+      osc.start(time);
+      osc.stop(time + beat * 1.4);
+    };
+
     const playLead = (note, time) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -600,6 +642,14 @@ export default function Home() {
       [40, 47],
       [43, 50],
     ];
+    const choirChords = [
+      [48, 55, 60],
+      [50, 57, 62],
+      [45, 52, 57],
+      [43, 50, 55],
+    ];
+    const chimePattern = [660, 740, 880, 990, 880, 740, 660, 880];
+    let step = 0;
 
     const scheduleBar = () => {
       const now = ctx.currentTime + 0.05;
@@ -615,6 +665,11 @@ export default function Home() {
       }
       playStab(stabChords[0], now);
       playStab(stabChords[1], now + beat * 2);
+      // Choir pad + chimes add a "castle" atmosphere inspired by the intro.
+      playChoirPad(choirChords[step % choirChords.length], now);
+      chimePattern.forEach((frequency, index) => {
+        playChime(frequency, now + index * (beat / 2));
+      });
 
       leadPattern.forEach((note, index) => {
         playLead(note, now + index * (beat / 2));
@@ -623,6 +678,8 @@ export default function Home() {
       bassPattern.forEach((note, index) => {
         playBass(note, now + index * (beat / 2));
       });
+
+      step += 1;
     };
 
     scheduleBar();
@@ -691,6 +748,20 @@ export default function Home() {
       return words.join(" ");
     }
     return words.slice(0, maxWords).join(" ");
+  };
+
+  // If the API returns no text, auto-advance so the quiz doesn't stall.
+  const handleQuizReply = (reply) => {
+    const trimmed = typeof reply === "string" ? reply.trim() : "";
+    if (!trimmed) {
+      if (quizAdvanceTimeoutRef.current) {
+        window.clearTimeout(quizAdvanceTimeoutRef.current);
+      }
+      quizAdvanceTimeoutRef.current = window.setTimeout(advanceQuiz, 150);
+      return;
+    }
+    // Reply length is guided by the prompt, not hard-truncated client-side.
+    setQuizComment(trimmed);
   };
 
   const buildQuizQuestions = () => {
@@ -2284,22 +2355,6 @@ export default function Home() {
     }
     const scored = question.scored;
     const isCorrect = option.correct;
-    const commentOptions = [
-      "Sure. If you insist.",
-      "Interesting. Boldly wrong?",
-      "Noted... for later judgment.",
-      "That tracks. Somehow.",
-      "Huh. Ok. Weird.",
-      "Bold choice. Questionable.",
-      "Logging that. Don't regret it.",
-      "Seems plausible. Barely.",
-      "You would pick that.",
-      "Acceptable. I guess.",
-      "Fascinating... in a chaotic way.",
-      "Alright then. Moving on.",
-    ];
-    const fallbackComment =
-      commentOptions[Math.floor(Math.random() * commentOptions.length)];
 
     setQuizLocked(true);
     setSelectedOption(option.label);
@@ -2323,11 +2378,10 @@ export default function Home() {
     })
       .then((response) => response.json())
       .then((data) => {
-        const reply = data?.message || fallbackComment;
-        setQuizComment(limitWords(reply, 12));
+        handleQuizReply(data?.message);
       })
       .catch(() => {
-        setQuizComment(limitWords(fallbackComment, 12));
+        handleQuizReply("");
       })
       .finally(() => {
         setFreeformSubmitting(false);
@@ -2350,16 +2404,6 @@ export default function Home() {
     setQuizTyping(false);
     setFreeformSubmitting(true);
 
-    if (currentQuestion.alwaysLast) {
-      const isNumeric = /^\s*\d+(\.\d+)?\s*$/.test(answer);
-      const reply = isNumeric
-        ? `So you're ${answer}? Bold number. I see the wear and tear.`
-        : "Binary asked your age. You answered chaos. Classic.";
-      setQuizComment(limitWords(reply, 12));
-      setFreeformSubmitting(false);
-      return;
-    }
-
     try {
       const response = await fetch("/api/quiz-response", {
         method: "POST",
@@ -2371,12 +2415,9 @@ export default function Home() {
         }),
       });
       const data = await response.json();
-      const reply =
-        data?.message ||
-        "Huh. I expected better input, but fine. Moving on.";
-      setQuizComment(limitWords(reply, 12));
+      handleQuizReply(data?.message);
     } catch (error) {
-      setQuizComment(limitWords("That response glitched out. Try again? Just kidding.", 12));
+      handleQuizReply("");
     } finally {
       setFreeformSubmitting(false);
     }
@@ -2586,6 +2627,7 @@ export default function Home() {
     setBossPhase("off");
     setBossHealth(6);
     setBossProjectiles([]);
+    setBossExplosions([]);
     setBossHitFlash(false);
     setBossHitText("");
     setBossSpeaking(false);
@@ -2661,6 +2703,7 @@ export default function Home() {
 
     setBossHealth(6);
     setBossProjectiles([]);
+    setBossExplosions([]);
     setBossHitText("");
     setBossHitFlash(false);
     setBossFire(false);
@@ -2713,44 +2756,91 @@ export default function Home() {
       bossProjectileIdRef.current = id;
       const startX = window.innerWidth * 0.5;
       const startY = window.innerHeight * 0.22;
+      // Aim once at the current cursor, then keep drifting along that line.
+      const { x: targetX, y: targetY } = mousePosRef.current;
+      let dx = targetX - startX;
+      let dy = targetY - startY;
+      let distance = Math.hypot(dx, dy);
+      if (distance < 1) {
+        dx = 1;
+        dy = 0;
+        distance = 1;
+      }
+      const speed = 5.6;
+      const vx = (dx / distance) * speed;
+      const vy = (dy / distance) * speed;
       setBossProjectiles((prev) => [
         ...prev,
-        { id, x: startX, y: startY },
+        { id, x: startX, y: startY, vx, vy },
       ]);
     };
+
+    const hitLines = [
+      "Got ya!",
+      "Direct hit!",
+      "Too slow!",
+      "Tagged!",
+      "Boom!",
+      "Right on target!",
+    ];
+    const hitRadius = 40;
 
     const tickProjectiles = () => {
       if (typeof window === "undefined") {
         return;
       }
-      // Projectiles track the latest mouse position to allow dodging.
-      const { x: targetX, y: targetY } = mousePosRef.current;
       const width = window.innerWidth;
       const height = window.innerHeight;
-      setBossProjectiles((prev) =>
-        prev
-          .map((projectile) => {
-            const dx = targetX - projectile.x;
-            const dy = targetY - projectile.y;
-            const distance = Math.max(1, Math.hypot(dx, dy));
-            const speed = 3.6;
-            if (distance <= speed) {
-              return { ...projectile, x: targetX, y: targetY };
-            }
-            return {
-              ...projectile,
-              x: projectile.x + (dx / distance) * speed,
-              y: projectile.y + (dy / distance) * speed,
-            };
-          })
-          .filter(
-            (projectile) =>
-              projectile.x > -80 &&
-              projectile.x < width + 80 &&
-              projectile.y > -80 &&
-              projectile.y < height + 80
-          )
-      );
+      const { x: cursorX, y: cursorY } = mousePosRef.current;
+      const hits = [];
+      const nextProjectiles = [];
+      bossProjectilesRef.current.forEach((projectile) => {
+        const nextX = projectile.x + projectile.vx;
+        const nextY = projectile.y + projectile.vy;
+        const dist = Math.hypot(cursorX - nextX, cursorY - nextY);
+        if (dist <= hitRadius) {
+          hits.push({ id: projectile.id, x: nextX, y: nextY });
+          return;
+        }
+        if (
+          nextX <= -80 ||
+          nextX >= width + 80 ||
+          nextY <= -80 ||
+          nextY >= height + 80
+        ) {
+          return;
+        }
+        nextProjectiles.push({ ...projectile, x: nextX, y: nextY });
+      });
+      setBossProjectiles(nextProjectiles);
+
+      if (hits.length) {
+        hits.forEach((hit) => {
+          if (soundEnabled) {
+            playBossCrashSound();
+            playBossExplosionSound();
+          }
+          const boomId = `boom-${hit.id}-${Date.now()}`;
+          setBossExplosions((prev) => [
+            ...prev,
+            { id: boomId, x: hit.x, y: hit.y },
+          ]);
+          window.setTimeout(() => {
+            setBossExplosions((prev) => prev.filter((boom) => boom.id !== boomId));
+          }, 240);
+          const line = hitLines[Math.floor(Math.random() * hitLines.length)];
+          setBossHitText(line);
+          if (bossHitTextTimeoutRef.current) {
+            window.clearTimeout(bossHitTextTimeoutRef.current);
+          }
+          bossHitTextTimeoutRef.current = window.setTimeout(() => {
+            setBossHitText("");
+          }, 900);
+          if (soundEnabled && !bossSpeaking) {
+            queueBossSpeech(line);
+          }
+        });
+      }
     };
 
     spawnProjectile();
@@ -2773,6 +2863,7 @@ export default function Home() {
     }
 
     setBossProjectiles([]);
+    setBossExplosions([]);
     setBossFire(true);
     setBossExplode(true);
     setBossEyesDead(true);
@@ -2824,6 +2915,7 @@ export default function Home() {
     stopBossModeAudio();
     stopVictoryAudio();
     setBossProjectiles([]);
+    setBossExplosions([]);
     setBossHitText("");
     setBossHitFlash(false);
     setBossFire(false);
@@ -2881,10 +2973,15 @@ export default function Home() {
     };
   }, [bossFinalLine, bossPhase, showCreditsScreen]);
 
+  useEffect(() => {
+    bossProjectilesRef.current = bossProjectiles;
+  }, [bossProjectiles]);
+
   const creditsLines = [
     "CREDITS:",
     "",
     "Project Manager - Simon",
+    "Creative Director - Noah",
     "",
     "Vibe Coders - Noah, Simon",
     "",
@@ -3812,60 +3909,126 @@ export default function Home() {
               </div>
             ) : null}
             <div className={styles.bossArena}>
+              <div className={styles.bossBackdrop} aria-hidden="true">
+                <div className={styles.bossCastle}>
+                  <div className={styles.bossCastleTierTop} />
+                  <div className={styles.bossCastleTierMid} />
+                  <div className={styles.bossCastleBody} />
+                  <div className={styles.bossCastleFrosting} />
+                  <div className={styles.bossCastleDrips} />
+                  <div className={styles.bossCastleSprinkles} />
+                  <div className={styles.bossCastleGate} />
+                  <div className={styles.bossCastleTurrets}>
+                    <div className={styles.bossCastleTurret}>
+                      <span className={styles.bossCastleTurretFlame} />
+                    </div>
+                    <div className={styles.bossCastleTurret}>
+                      <span className={styles.bossCastleTurretFlame} />
+                    </div>
+                  </div>
+                  <div className={styles.bossCastleWindows}>
+                    <span className={styles.bossCastleWindow} />
+                    <span className={styles.bossCastleWindow} />
+                    <span className={styles.bossCastleWindow} />
+                    <span className={styles.bossCastleWindow} />
+                  </div>
+                  <div className={styles.bossCastleBanner}>
+                    <span className={styles.bossCastleFlag} />
+                    <span className={styles.bossCastleFlag} />
+                    <span className={styles.bossCastleFlag} />
+                    <span className={styles.bossCastleFlag} />
+                    <span className={styles.bossCastleFlag} />
+                  </div>
+                  <div className={styles.bossCastleCandles}>
+                    <span className={styles.bossCastleCandle} />
+                    <span className={styles.bossCastleCandle} />
+                    <span className={styles.bossCastleCandle} />
+                    <span className={styles.bossCastleCandle} />
+                    <span className={styles.bossCastleCandle} />
+                  </div>
+                  <div className={`${styles.bossBalloons} ${styles.bossBalloonsLeft}`}>
+                    <span className={styles.bossBalloon} />
+                    <span className={styles.bossBalloon} />
+                    <span className={styles.bossBalloon} />
+                    <span className={styles.bossBalloon} />
+                  </div>
+                  <div className={styles.bossBalloons}>
+                    <span className={styles.bossBalloon} />
+                    <span className={styles.bossBalloon} />
+                    <span className={styles.bossBalloon} />
+                    <span className={styles.bossBalloon} />
+                    <span className={styles.bossBalloon} />
+                    <span className={styles.bossBalloon} />
+                  </div>
+                </div>
+              </div>
               <div
-                className={`${styles.bossBot} ${
-                  bossPhase === "intro" ? styles.bossBotRise : ""
-                } ${bossHitFlash ? styles.bossHitFlash : ""} ${
-                  bossFire ? styles.bossBotFire : ""
-                } ${bossExplode ? styles.bossBotExplode : ""} ${
-                  bossEyesDead ? styles.bossBotDead : ""
-                } ${bossSpeaking ? styles.bossBotSpeaking : ""} ${
-                  bossPhase === "defeated" && !bossFallOut ? styles.bossBotShake : ""
-                } ${bossFallOut ? styles.bossBotFallOut : ""}`}
-                role="button"
-                tabIndex={0}
-                onClick={handleBossHit}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    handleBossHit();
-                  }
-                }}
+                className={`${styles.bossBotWrapper} ${
+                  bossPhase === "battle" ? styles.bossBotFloat : ""
+                }`}
               >
-                <div className={styles.bossBotAntenna} />
-                <div className={styles.bossBotCakeTop} />
-                <div className={styles.bossBotFrosting} />
-                <div className={styles.bossBotCakeBase}>
-                  <span className={styles.bossBotPlate} />
-                  <span className={styles.bossBotPlate} />
+                <div
+                  className={`${styles.bossBot} ${
+                    bossPhase === "intro" ? styles.bossBotRise : ""
+                  } ${bossHitFlash ? styles.bossHitFlash : ""
+                  } ${bossFire ? styles.bossBotFire : ""
+                  } ${bossExplode ? styles.bossBotExplode : ""} ${
+                    bossEyesDead ? styles.bossBotDead : ""
+                  } ${bossSpeaking ? styles.bossBotSpeaking : ""} ${
+                    bossPhase === "defeated" && !bossFallOut ? styles.bossBotShake : ""
+                  } ${bossFallOut ? styles.bossBotFallOut : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={handleBossHit}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      handleBossHit();
+                    }
+                  }}
+                >
+                  <div className={styles.bossBotAntenna} />
+                  <div className={styles.bossBotCakeTop} />
+                  <div className={styles.bossBotFrosting} />
+                  <div className={styles.bossBotCakeBase}>
+                    <span className={styles.bossBotPlate} />
+                    <span className={styles.bossBotPlate} />
+                  </div>
+                  <div className={styles.bossBotCandles}>
+                    <div className={styles.bossBotCandle}>
+                      <span className={styles.bossBotFlame} />
+                    </div>
+                    <div className={styles.bossBotCandle}>
+                      <span className={styles.bossBotFlame} />
+                    </div>
+                    <div className={styles.bossBotCandle}>
+                      <span className={styles.bossBotFlame} />
+                    </div>
+                  </div>
+                  <div className={styles.bossBotFace}>
+                    <div className={styles.bossBotBrows}>
+                      <span className={styles.bossBotBrow} />
+                      <span className={styles.bossBotBrow} />
+                    </div>
+                    <div className={styles.bossBotEyes}>
+                      <div className={styles.bossBotEye} />
+                      <div className={styles.bossBotEye} />
+                    </div>
+                  </div>
+                  <div className={styles.bossBotMouth} />
                 </div>
-                <div className={styles.bossBotCandles}>
-                  <div className={styles.bossBotCandle}>
-                    <span className={styles.bossBotFlame} />
-                  </div>
-                  <div className={styles.bossBotCandle}>
-                    <span className={styles.bossBotFlame} />
-                  </div>
-                  <div className={styles.bossBotCandle}>
-                    <span className={styles.bossBotFlame} />
-                  </div>
-                </div>
-                <div className={styles.bossBotFace}>
-                  <div className={styles.bossBotBrows}>
-                    <span className={styles.bossBotBrow} />
-                    <span className={styles.bossBotBrow} />
-                  </div>
-                  <div className={styles.bossBotEyes}>
-                    <div className={styles.bossBotEye} />
-                    <div className={styles.bossBotEye} />
-                  </div>
-                </div>
-                <div className={styles.bossBotMouth} />
               </div>
               {bossProjectiles.map((projectile) => (
                 <div
                   key={projectile.id}
                   className={styles.bossProjectile}
                   style={{ transform: `translate(${projectile.x}px, ${projectile.y}px)` }}
+                />
+              ))}
+              {bossExplosions.map((boom) => (
+                <div
+                  key={boom.id}
+                  className={styles.bossProjectileExplosion}
+                  style={{ "--x": `${boom.x}px`, "--y": `${boom.y}px` }}
                 />
               ))}
               {bossHitText ? (
@@ -3919,5 +4082,3 @@ export default function Home() {
       </main>
     );
   }
-
-

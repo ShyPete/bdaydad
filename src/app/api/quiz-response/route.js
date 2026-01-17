@@ -90,17 +90,6 @@ const pickMany = (rng, list, count) => {
   return picks;
 };
 
-const limitWords = (text, maxWords) => {
-  const words = String(text || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (words.length <= maxWords) {
-    return words.join(" ");
-  }
-  return words.slice(0, maxWords).join(" ");
-};
-
 export async function POST(request) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -192,5 +181,5 @@ export async function POST(request) {
     );
   }
 
-  return NextResponse.json({ message: limitWords(message, 12) });
+  return NextResponse.json({ message });
 }

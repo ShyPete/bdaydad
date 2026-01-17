@@ -52,16 +52,20 @@ birthday.
   victory sound, then two angry typed BirthdayBot messages.
 - Boss finale (quiz pass): after the pass speech, the safe-mode bot drops offscreen
   with a crash SFX, a mecha BirthdayBot rises in, shoots larger fast-tracking
-  projectiles, and takes 6 clicks to defeat. Hits play SFX + "oof/ouch"; death
+  projectiles that drift past the cursor and offscreen, and takes 6 clicks to defeat. Cursor hits trigger a small crash/explosion SFX, a brief explosion flash, and a short boss taunt. Hits play SFX + "oof/ouch"; death
   triggers an explosion effect + flames, X eyes, and a spoken, punctuated sequence
   before the final birthday shout. The boss shakes on defeat, then slides offscreen;
+  boss fight music layers in castle-like chimes + choir pad inspired by the intro,
+  and the boss wanders around the arena while battling inside a detailed cake-castle lair backdrop
+  with candles, banners, windows, sprinkles, balloons, and oversized candle turrets
+  on the shoulders (no side towers).
   the final shout is centered, multicolored, free-floating, split into two lines,
   and has a subtle translucent backing.
 - After the final shout, a timed button appears to launch a scrolling credits screen
   that starts closer to the bottom so lines show faster.
 - Quiz updates: 5 freeform text questions (unscored) interleaved with MCQs; all quiz
-  responses come from `/api/quiz-response` and are hard-limited to 12 words. The
-  binary “Your age?” question is forced last with custom numeric/non-numeric responses.
+  responses come from `/api/quiz-response` and are guided to ~12-16 words by the prompt
+  (no hard cap or local fallback copy). The binary “Your age?” question is forced last.
 - Quiz buttons have hover/focus states and a visible selected state.
 - Browser tab title is "BirthdayBot5000"; favicon uses the BirthdayBot icon.
 - Popup window styling must remain consistent unless explicitly requested.

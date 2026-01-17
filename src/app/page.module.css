@@ -1070,6 +1070,308 @@
   pointer-events: none;
 }
 
+.bossBackdrop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+.bossBackdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 130, 80, 0.25), transparent 60%),
+    linear-gradient(180deg, rgba(30, 18, 38, 0.9), rgba(10, 6, 14, 0.9));
+  mix-blend-mode: screen;
+}
+
+.bossCastle {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, 92vw);
+  height: min(420px, 58vh);
+  margin-bottom: 0;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.6));
+}
+
+.bossCastleTierTop,
+.bossCastleTierMid {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #f6c67b, #db854f);
+  border: 4px solid #3a1a22;
+  border-radius: 30px 30px 16px 16px;
+  box-shadow: inset 0 -12px rgba(0, 0, 0, 0.2);
+}
+
+.bossCastleTierTop {
+  top: 8%;
+  width: 36%;
+  height: 20%;
+}
+
+.bossCastleTierMid {
+  top: 26%;
+  width: 54%;
+  height: 22%;
+}
+
+.bossCastleBody {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 74%;
+  height: 48%;
+  background: linear-gradient(180deg, #f2b56b, #d07a45);
+  border: 4px solid #3a1a22;
+  border-radius: 28px 28px 18px 18px;
+  box-shadow: inset 0 -14px rgba(0, 0, 0, 0.2);
+}
+
+.bossCastleFrosting {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 74%;
+  height: 18%;
+  background: linear-gradient(180deg, #fff1dc, #f6d6b6);
+  border: 3px solid #3a1a22;
+  border-radius: 999px 999px 18px 18px;
+  box-shadow: inset 0 -6px rgba(0, 0, 0, 0.15);
+}
+
+.bossCastleDrips {
+  position: absolute;
+  top: 33%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 68%;
+  height: 16%;
+  background: radial-gradient(circle at 12% 0%, #fff1dc 40%, transparent 42%),
+    radial-gradient(circle at 38% 0%, #fff1dc 40%, transparent 42%),
+    radial-gradient(circle at 64% 0%, #fff1dc 40%, transparent 42%),
+    radial-gradient(circle at 88% 0%, #fff1dc 40%, transparent 42%);
+}
+
+.bossCastleSprinkles {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 10%;
+  background:
+    radial-gradient(circle at 10% 60%, #ff7ad9 0 4px, transparent 5px),
+    radial-gradient(circle at 30% 20%, #ffd166 0 4px, transparent 5px),
+    radial-gradient(circle at 50% 70%, #9bf6ff 0 4px, transparent 5px),
+    radial-gradient(circle at 70% 35%, #bdb2ff 0 4px, transparent 5px),
+    radial-gradient(circle at 88% 55%, #ffadad 0 4px, transparent 5px);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.bossCastleGate {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26%;
+  height: 36%;
+  background: linear-gradient(180deg, #6b2c2c, #2a0f12);
+  border: 4px solid #1a0a10;
+  border-radius: 50% 50% 16px 16px;
+  box-shadow: inset 0 -8px rgba(0, 0, 0, 0.35);
+}
+
+.bossCastleWindows {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 42%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bossCastleWindow {
+  width: 18px;
+  height: 28px;
+  border-radius: 10px;
+  background: radial-gradient(circle at 50% 20%, #ffe08a, #ff9f4a);
+  border: 2px solid #3a1a22;
+  box-shadow: 0 0 12px rgba(255, 170, 90, 0.7);
+}
+
+.bossCastleBanner {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+
+.bossCastleFlag {
+  width: 16px;
+  height: 20px;
+  background: linear-gradient(180deg, #ff7ad9, #ffadad);
+  border-radius: 6px 6px 2px 2px;
+  border: 2px solid #3a1a22;
+  transform: rotate(-6deg);
+}
+
+.bossCastleFlag:nth-child(2n) {
+  background: linear-gradient(180deg, #9bf6ff, #bdb2ff);
+  transform: rotate(6deg);
+}
+
+.bossCastleCandles {
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+}
+
+.bossCastleCandle {
+  position: relative;
+  width: 12px;
+  height: 32px;
+  background: #fff3da;
+  border: 2px solid #3a1a22;
+  border-radius: 8px;
+}
+
+.bossCastleCandle::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  background: #ff7a4a;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  animation: bossCastleFlicker 1.1s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(255, 160, 90, 0.8);
+}
+
+.bossCastleTurrets {
+  position: absolute;
+  bottom: 46%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 88%;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.bossCastleTurret {
+  position: relative;
+  width: min(78px, 14vw);
+  height: min(140px, 26vh);
+  background: linear-gradient(180deg, #fff0d8, #e6a05a);
+  border: 4px solid #3a1a22;
+  border-radius: 999px 999px 20px 20px;
+  box-shadow: inset 0 -12px rgba(0, 0, 0, 0.2);
+}
+
+.bossCastleTurret::before {
+  content: "";
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40%;
+  height: 60%;
+  background: linear-gradient(180deg, #fff6ea, #f3c590);
+  border-radius: 999px;
+  border: 2px solid rgba(58, 26, 34, 0.5);
+}
+
+.bossCastleTurretFlame {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  background: radial-gradient(circle, #ffe08a 20%, #ff7a4a 70%);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 0 18px rgba(255, 160, 90, 0.8);
+  animation: bossCastleFlicker 1.2s ease-in-out infinite;
+}
+
+.bossBalloons {
+  position: absolute;
+  right: 2%;
+  bottom: 6%;
+  display: grid;
+  gap: 10px;
+}
+
+.bossBalloonsLeft {
+  left: 4%;
+  right: auto;
+  bottom: 12%;
+}
+
+.bossBalloon {
+  width: 28px;
+  height: 36px;
+  background: radial-gradient(circle at 30% 30%, #fff, #ff7ad9);
+  border-radius: 50% 50% 45% 45%;
+  border: 2px solid #3a1a22;
+  position: relative;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+}
+
+.bossBalloon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  width: 2px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  transform: translateX(-50%);
+}
+
+.bossBalloon:nth-child(2n) {
+  background: radial-gradient(circle at 30% 30%, #fff, #ffd166);
+}
+
+.bossBalloon:nth-child(3n) {
+  background: radial-gradient(circle at 30% 30%, #fff, #9bf6ff);
+}
+
+.bossBalloon:nth-child(4n) {
+  background: radial-gradient(circle at 30% 30%, #fff, #bdb2ff);
+}
+
+.bossBotWrapper {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* Boss drifts around the arena during the battle. */
+.bossBotFloat {
+  animation: bossWander 8s ease-in-out infinite;
+}
+
 .bossBot {
   width: min(360px, 70vw);
   aspect-ratio: 3 / 4;
@@ -1318,6 +1620,20 @@
   pointer-events: none;
 }
 
+.bossProjectileExplosion {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe08a, #ff7a4a 55%, transparent 70%);
+  box-shadow: 0 0 18px rgba(255, 160, 90, 0.9);
+  animation: bossProjectileBoom 0.24s ease-out forwards;
+  pointer-events: none;
+  transform: translate(var(--x), var(--y)) scale(0.6);
+}
+
 .bossHitText {
   position: absolute;
   bottom: 20%;
@@ -1339,7 +1655,7 @@
 /* Final shout is free-floating with a rainbow gradient and subtle backing. */
 .bossFinalText {
   position: absolute;
-  top: 50%;
+  top: calc(62% + 30px);
   left: 50%;
   bottom: auto;
   max-width: min(1300px, 98vw);
@@ -1390,6 +1706,24 @@
   }
   to {
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bossWander {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(90px, -28px);
+  }
+  50% {
+    transform: translate(-80px, 44px);
+  }
+  75% {
+    transform: translate(70px, 28px);
+  }
+  100% {
+    transform: translate(0, 0);
   }
 }
 
@@ -1498,6 +1832,29 @@
   }
   to {
     transform: translateY(-30px);
+  }
+}
+
+@keyframes bossCastleFlicker {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.12);
+    opacity: 1;
+  }
+}
+
+@keyframes bossProjectileBoom {
+  0% {
+    transform: translate(var(--x), var(--y)) scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(var(--x), var(--y)) scale(1.2);
+    opacity: 0;
   }
 }
 
